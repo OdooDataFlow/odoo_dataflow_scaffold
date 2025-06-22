@@ -9,7 +9,7 @@ import platform
 import odoolib
 import io
 import socket
-from odoo_csv_tools.lib import conf_lib
+from odoo_data_flow_tools.lib import conf_lib
 
 module_version = '1.4.2'
 offline = False
@@ -54,17 +54,17 @@ def is_remote_host(hostname):
     """
     Return True if 'hostname' is not the local host.
     """
-    my_host_name = socket.gethostname() 
+    my_host_name = socket.gethostname()
     my_host_ip = socket.gethostbyname(my_host_name)
     if any(hostname in x for x in [my_host_name, my_host_ip, socket.getfqdn(), 'localhost', '127.0.0.1']):
         return False
     return True
-    
+
 
 @check_file_exists
 def create_connection_file_local(file):
     """
-    Enforce encrypted connection on remote hosts. 
+    Enforce encrypted connection on remote hosts.
     Leave unencrypted for local databases.
     """
     is_remote = is_remote_host(host)
@@ -159,7 +159,6 @@ def create_transform_script(file):
             f.write("# load_script python_script (without extension)\n")
             f.write("chmod +x *.sh\n")
         os.chmod(file, 0o755)
-    
 
 @check_file_exists
 def create_load_script(file):
@@ -242,7 +241,7 @@ def create_file_prefix(file):
         f.write("#    'E': 'en_US',\n")
         f.write("}\n\n")
         f.write("# XML ID PREFIXES\n")
-    
+
 
 @check_file_exists
 def create_file_mapping(file):
@@ -253,7 +252,7 @@ def create_file_mapping(file):
         f.write("# -*- coding: utf-8 -*-\n\n")
         f.write("# This file defines mapping dictionaries.\n\n")
         f.write("# MAPPING DICTIONARIES\n")
-        f.write("# Use odoo_import_scaffold with option --map-selection to\n")
+        f.write("# Use odoo_dataflow_scaffold with option --map-selection to\n")
         f.write("# automatically build dictionaries of selection fields.\n\n")
 
 
@@ -281,7 +280,6 @@ def create_file_files(file):
         if not model:
             f.write("# Client file: src_my_model = os.path.join(data_src_dir, 'my_model.csv')\n")
             f.write("# Import file: dest_my_model = os.path.join(data_dest_dir, 'my.model.csv')\n")
-        
         f.write("\n")
 
 
@@ -723,7 +721,6 @@ class ModelField:
 
         if self.import_warn_msg:
             self.info = "%s\n%s %s" % (self.info, '    # AVOID THIS FIELD:', ', '.join(self.import_warn_msg))
-        
         if sys.version_info >= (3, 0, 0):
             return self.info
         else:
@@ -737,7 +734,7 @@ class ModelField:
         Return the field name as needed in the import file.
         """
         return '/'.join((self.name, 'id')) if self.type in ('many2one', 'many2many') else self.name
-    
+
     def get_mapper_command(self):
         """
         Return a suited mapper function according to the field properties and skeleton options.
@@ -747,7 +744,6 @@ class ModelField:
                 return "mapper.val('%s')" % self.name
             else:
                 return "mapper.m2o_map(OBJECT_XMLID_PREFIX, mapper.concat('_', 'CSV_COLUMN1','CSV_COLUMN2'))"
-        
         elif self.type in ('integer', 'float', 'monetary'):
             return "mapper.num('%s')" % self.get_name()
         elif self.type in ('boolean'):
@@ -768,7 +764,7 @@ class ModelField:
 
         else:
             return "mapper.val('%s')" % self.get_name()
-    
+
     def is_required(self):
         return self.required and len(self.default_value) == 0
 
@@ -792,7 +788,6 @@ def load_fields():
         has_computed_fields = has_computed_fields or len(f.compute) > 1
         ret.append(f)
     return ret
-    
 
 def write_begin(file):
     """
@@ -875,7 +870,7 @@ def write_mapping(file):
         filtering = "%s and f.name not in ('create_uid', 'write_uid', 'create_date', 'write_date', 'active')" % filtering
     fields = filter(eval(filtering), fields)
     fields = sorted(fields, key=lambda f: ((f.name != 'id'), not f.is_required(), f.name))
-    
+
     if skeleton == 'dict':
         file.write('%s = {\n' % model_mapping_name)
         for f in fields:
@@ -884,7 +879,7 @@ def write_mapping(file):
             file.write ("    # %s\n" % f.get_info())
             file.write("    %s'%s': %s,\n" % (line_start,f.get_mapping_name(), f.get_mapper_command().replace('OBJECT_XMLID_PREFIX', 'PREFIX_%s' % model_mapped_name.upper())))
         file.write('}\n\n')
-            
+
     elif skeleton == 'map':
         function_prefix = 'handle_%s_' % model_mapped_name
         for f in fields:
@@ -892,7 +887,7 @@ def write_mapping(file):
             line_start = '# ' if (required and not f.is_required()) or f.import_warn_msg else ''
             file.write ("%sdef %s%s(line):\n" % (line_start, function_prefix, f.name))
             file.write ("%s    return %s(line)\n\n" % (line_start,f.get_mapper_command().replace('OBJECT_XMLID_PREFIX', 'PREFIX_%s' % model_mapped_name.upper())))
-        
+
         file.write('%s = {\n' % model_mapping_name)
         for f in fields:
             if verbose: sys.stdout.write('Write field %s\n' % f.name)
@@ -963,7 +958,7 @@ def scaffold_model():
     elif not model_exists(model):
         sys.stderr.write("Model %s not found\n" % model)
         return
-    
+
     do_file = skeleton or offline
 
     if os.path.isfile(outfile):
@@ -1020,7 +1015,7 @@ def scaffold_model():
             sys.stdout.write('Prefix PREFIX_%s added in %s\n' % (model_mapped_name.upper(), script))
         else:
             if verbose: sys.stdout.write('XML_ID prefix not added because of option --with-xmlid\n')
-        
+
         # Add model to files.py
         script = os.path.join(dirname, 'files.py')
         with open (script, 'a') as f:
@@ -1096,9 +1091,9 @@ if __name__ == '__main__':
     """ % (module_version, module_name, module_name, module_name)
 
     module_epilog = """
-    More information on https://github.com/jad-odoo/odoo_import_scaffold
+    More information on https://github.com/OdooDataFlow/odoo_dataflow_scaffold
     """
-    
+
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, description=module_descr, epilog=module_epilog)
     parser.add_argument('-s', '--scaffold', dest='scaffold', action='store_true', help='create the folders structure and the basic project files')
     parser.add_argument('-p', '--path', dest='path', default=default_base_dir, required=False, help='project path (default: current dir)')
@@ -1123,7 +1118,7 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--list', dest='list', action='store_true', help="List installed models in the target Odoo instance")
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='display process information')
     parser.add_argument('--version', dest='version', action='store_true', help='show version')
-    
+
     args = parser.parse_args()
 
     # Manage params
@@ -1181,7 +1176,7 @@ if __name__ == '__main__':
             project_name = os.path.basename(os.path.normpath(os.getcwd()))
         else:
             project_name = os.path.basename(os.path.normpath(base_dir))
-        
+
         conf_dir = os.path.join(base_dir, conf_dir_name)
         orig_dir = os.path.join(base_dir, orig_dir_name)
         orig_raw_dir = os.path.join(base_dir, orig_raw_dir_name)
@@ -1206,5 +1201,5 @@ if __name__ == '__main__':
         csv_delimiter = ';'
         default_python_exe = ''
         default_path = ''
-        
+
         scaffold_model()
