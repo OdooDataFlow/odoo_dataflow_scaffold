@@ -1139,6 +1139,84 @@ def main() -> None:
 
     script_extension = '.cmd' if platform.system() == 'Windows' else '.sh'
 
+    module_descr = f"""Version: {module_version}
+    Create the structure of an import project and model skeleton codes working 
+    with odoo_data_flow (https://github.com/OdooDataFlow/odoo-data-flow).
+
+    Functionalities:
+    ----------------
+    - Create the project structure:
+    {module_name} -s -p PATH [-d DBNAME] [-t HOST] [-u USERID] [-f] [-v]
+
+    - Skeleton a model:
+    {module_name} -m MODEL [-a] [--map-selection] [--with-xmlid] [-r] [-k map | -n]
+                            [--with-one2many] [--with-metadata] [--stored] [-v]
+                            [--max-descr MAXDESCR] [-f] [-o OUTFILE] [-c CONFIG]
+
+    - Show available models:
+    {module_name} -l [-c CONFIG]
+    """
+
+    module_epilog = """
+    More information on https://github.com/OdooDataFlow/odoo_dataflow_scaffold
+    """
+
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, description=module_descr, epilog=module_epilog)
+    parser.add_argument('-s', '--scaffold', dest='scaffold', action='store_true', help='create the folders structure and the basic project files')
+    parser.add_argument('-p', '--path', dest='path', type=Path, default=default_base_dir, required=False, help='project path (default: current dir)')
+    parser.add_argument('-d', '--db', dest='dbname', default='', required=False, help='target database. If omitted, it is the first part of HOST')
+    parser.add_argument('-t', '--host', dest='host', default='localhost', required=False, help='hostname of the database (default: localhost)')
+    parser.add_argument('-u', '--userid', dest='userid', type=int, default=2, required=False, help='user id of RPC calls (default: 2)')
+    parser.add_argument('-m', '--model', dest='model', required=False, help='technical name of the model to skeleton (ex: res.partner)')
+    parser.add_argument('-c', '--config', dest='config', type=Path, default=Path(conf_dir_name) / 'connection.conf', required=False, help=f'configuration file (relative to --path) defining the RPC connections parameters (default: {Path(conf_dir_name) / "connection.conf"})')
+    parser.add_argument('-o', '--outfile', dest='outfile', type=Path, required=False, help='python script of the model skeleton code (default: model name with dots replaced by underscores)')
+    parser.add_argument('-k', '--skeleton', dest='skeleton', choices=['dict','map'], default='dict', required = False, help='skeleton code type. dict: generate mapping as a simple dictionary. map: create the same dictionary with map functions for each field (default: dict)')
+    parser.add_argument('-r', '--required', dest='required',  action='store_true', help='keep only the required fields without default value (comment the optional fields')
+    parser.add_argument('--field-name', dest='fieldname', choices=['tech','user'], default='user', required = False, help='Field name in import file. tech=technical name, user=User name (default: user). Generates the mapping accordingly.')
+    parser.add_argument('--stored', dest='wstored', action='store_true', help="include only stored fields")
+    parser.add_argument('--with-o2m', dest='wo2m', action='store_true', help="include one2many fields")
+    parser.add_argument('--with-metadata', dest='wmetadata', action='store_true', help="include metadata fields")
+    parser.add_argument('--map-selection', dest='mapsel', action='store_true', help="generate inverse mapping dictionaries (visible value -> technical value) of selection fields in mapping.py")
+    parser.add_argument('--with-xmlid', dest='wxmlid', action='store_true', help="assume the client file contains XML_IDs in identifier fields")
+    parser.add_argument('--max-descr', dest='maxdescr', type=int, default=10, help="limit long descriptions of default value and compute method to MAXDESCR lines (default: 10)")
+    parser.add_argument('-n', '--offline', dest='offline', action='store_true', help="don't fetch fields from model. Create a minimal skeleton")
+    parser.add_argument('-a', '--append', dest='append', action='store_true', help="add model references to files.py, prefix.py and action scripts")
+    parser.add_argument('-f', '--force', dest='force', action='store_true', help='overwrite files and directories if existing.')
+    parser.add_argument('--create-export-script', dest='create_export_script', action='store_true', help="Create a shell script to export data based on the generated mapper.")
+    parser.add_argument('--export-fields', dest='export_fields', action='store_true', help="Output a comma-separated list of field names suitable for export.")
+    parser.add_argument('-l', '--list', dest='list', action='store_true', help="List installed models in the target Odoo instance")
+    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='display process information')
+    parser.add_argument('--version', dest='version', action='store_true', help='show version')
+
+    args = parser.parse_args()
+
+    # Manage params
+    scaffold = args.scaffold
+    base_dir = args.path
+    dbname = args.dbname
+    host = args.host
+    model = args.model
+    userid = args.userid
+    config = args.config
+    outfile = args.outfile
+    required = args.required
+    skeleton = args.skeleton
+    wstored = args.wstored
+    wo2m = args.wo2m
+    wmetadata = args.wmetadata
+    mapsel = args.mapsel
+    wxmlid = args.wxmlid
+    maxdescr = args.maxdescr
+    offline = args.offline
+    append = args.append
+    create_export_script = args.create_export_script
+    export_fields = args.export_fields
+    list = args.list
+    force = args.force
+    verbose = args.verbose
+    version = args.version
+    fieldname = args.fieldname
+
     # Do unit actions
     if version:
         show_version()
