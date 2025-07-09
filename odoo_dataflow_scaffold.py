@@ -944,7 +944,6 @@ def scaffold_model() -> None:
     global host
     import configparser
     cfg = configparser.ConfigParser(defaults={'protocol': 'xmlrpc', 'port': 8069})
-    sys.stdout.write(f"Attempting to read config from: {config.resolve()}\n")
     cfg.read(str(config))
     host = cfg.get('Connection', 'hostname')
     dbname = cfg.get('Connection', 'database')
@@ -1059,6 +1058,70 @@ def show_version() -> None:
 # MAIN
 ##############################################################################
 
+def create_export_script_file(model: str, model_mapped_name: str, outfile: Path, script_extension: str) -> None:
+    """Create a shell script to export data based on the generated mapper."""
+    mapper_file_name = f'{model_mapped_name}.py'
+    mapper_file_path = Path(outfile).parent / mapper_file_name
+
+    if not mapper_file_path.is_file():
+        sys.stderr.write(f"Error: Mapper file {mapper_file_path} not found. Please generate it first using -m MODEL.\n")
+        sys.exit(1)
+
+    with mapper_file_path.open('r', encoding='utf-8') as f:
+        mapper_content = f.read()
+
+    # Simple parsing to extract field names from the mapping dictionary
+    # This assumes the mapping is defined as a dictionary named 'mapping_<model_mapped_name>'
+    # and each field is a key in that dictionary.
+    field_names = []
+    mapping_var_name = f'mapping_{model_mapped_name}'
+    
+    # Find the mapping dictionary definition
+    mapping_start = mapper_content.find(f'{mapping_var_name} = {{')
+    if mapping_start == -1:
+        sys.stderr.write(f"Error: Could not find mapping dictionary '{mapping_var_name}' in {mapper_file_path}.\n")
+        sys.exit(1)
+    
+    mapping_end = mapper_content.find('}\n\n', mapping_start)
+    if mapping_end == -1:
+        sys.stderr.write(f"Error: Could not find end of mapping dictionary in {mapper_file_path}.\n")
+        sys.exit(1)
+
+    mapping_dict_str = mapper_content[mapping_start + len(f'{mapping_var_name} = {{'):mapping_end]
+    
+    for line in mapping_dict_str.splitlines():
+        line = line.strip()
+        if line.startswith('#') or not line:
+            continue
+        
+        # Extract the key (field name)
+        try:
+            field_name = line.split(':')[0].strip().strip('\'"')
+            if field_name:
+                field_names.append(field_name)
+        except IndexError:
+            continue
+
+    if not field_names:
+        sys.stderr.write(f"Warning: No field names found in mapper file {mapper_file_path}.\n")
+        
+    export_script_name = f'{model_mapped_name}_export{script_extension}'
+    export_script_path = Path(outfile).parent / export_script_name
+
+    with export_script_path.open('w', encoding='utf-8') as f:
+        if platform.system() != 'Windows':
+            f.write("#!/usr/bin/env bash\n\n")
+        f.write(f"odoo-data-flow export \\\n")
+        f.write(f"    --config conf/connection.conf \\\n")
+        f.write(f"    --model \"{model}\" \\\n")
+        f.write(f"    --file \"origin/{model_mapped_name}.csv\" \\\n")
+        f.write(f"    --fields \"{','.join(field_names)}\"\n")
+    
+    if platform.system() != 'Windows':
+        export_script_path.chmod(0o755)
+
+    sys.stdout.write(f"Export script created at {export_script_path}\n")
+
 def main() -> None:
     """Main function."""
     global module_name, conf_dir_name, orig_dir_name, data_dir_name, log_dir_name, selection_sep, default_base_dir
@@ -1074,80 +1137,7 @@ def main() -> None:
     selection_sep = ': '
     default_base_dir = Path('.')
 
-
-    module_descr = f"""Version: {module_version}
-    Create the structure of an import project and model skeleton codes working 
-    with odoo_data_flow (https://github.com/OdooDataFlow/odoo-data-flow).
-
-    Functionalities:
-    ----------------
-    - Create the project structure:
-    {module_name} -s -p PATH [-d DBNAME] [-t HOST] [-u USERID] [-f] [-v]
-
-    - Skeleton a model:
-    {module_name} -m MODEL [-a] [--map-selection] [--with-xmlid] [-r] [-k map | -n]
-                            [--with-one2many] [--with-metadata] [--stored] [-v]
-                            [--max-descr MAXDESCR] [-f] [-o OUTFILE] [-c CONFIG]
-
-    - Show available models:
-    {module_name} -l [-c CONFIG]
-    """
-
-    module_epilog = """
-    More information on https://github.com/OdooDataFlow/odoo_dataflow_scaffold
-    """
-
-    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, description=module_descr, epilog=module_epilog)
-    parser.add_argument('-s', '--scaffold', dest='scaffold', action='store_true', help='create the folders structure and the basic project files')
-    parser.add_argument('-p', '--path', dest='path', type=Path, default=default_base_dir, required=False, help='project path (default: current dir)')
-    parser.add_argument('-d', '--db', dest='dbname', default='', required=False, help='target database. If omitted, it is the first part of HOST')
-    parser.add_argument('-t', '--host', dest='host', default='localhost', required=False, help='hostname of the database (default: localhost)')
-    parser.add_argument('-u', '--userid', dest='userid', type=int, default=2, required=False, help='user id of RPC calls (default: 2)')
-    parser.add_argument('-m', '--model', dest='model', required=False, help='technical name of the model to skeleton (ex: res.partner)')
-    parser.add_argument('-c', '--config', dest='config', type=Path, default=Path(conf_dir_name) / 'connection.conf', required=False, help=f'configuration file (relative to --path) defining the RPC connections parameters (default: {Path(conf_dir_name) / "connection.conf"})')
-    parser.add_argument('-o', '--outfile', dest='outfile', type=Path, required=False, help='python script of the model skeleton code (default: model name with dots replaced by underscores)')
-    parser.add_argument('-k', '--skeleton', dest='skeleton', choices=['dict','map'], default='dict', required = False, help='skeleton code type. dict: generate mapping as a simple dictionary. map: create the same dictionary with map functions for each field (default: dict)')
-    parser.add_argument('-r', '--required', dest='required',  action='store_true', help='keep only the required fields without default value (comment the optional fields')
-    parser.add_argument('--field-name', dest='fieldname', choices=['tech','user'], default='user', required = False, help='Field name in import file. tech=technical name, user=User name (default: user). Generates the mapping accordingly.')
-    parser.add_argument('--stored', dest='wstored', action='store_true', help="include only stored fields")
-    parser.add_argument('--with-o2m', dest='wo2m', action='store_true', help="include one2many fields")
-    parser.add_argument('--with-metadata', dest='wmetadata', action='store_true', help="include metadata fields")
-    parser.add_argument('--map-selection', dest='mapsel', action='store_true', help="generate inverse mapping dictionaries (visible value -> technical value) of selection fields in mapping.py")
-    parser.add_argument('--with-xmlid', dest='wxmlid', action='store_true', help="assume the client file contains XML_IDs in identifier fields")
-    parser.add_argument('--max-descr', dest='maxdescr', type=int, default=10, help="limit long descriptions of default value and compute method to MAXDESCR lines (default: 10)")
-    parser.add_argument('-n', '--offline', dest='offline', action='store_true', help="don't fetch fields from model. Create a minimal skeleton")
-    parser.add_argument('-a', '--append', dest='append', action='store_true', help="add model references to files.py, prefix.py and action scripts")
-    parser.add_argument('-f', '--force', dest='force', action='store_true', help='overwrite files and directories if existing.')
-    parser.add_argument('-l', '--list', dest='list', action='store_true', help="List installed models in the target Odoo instance")
-    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='display process information')
-    parser.add_argument('--version', dest='version', action='store_true', help='show version')
-
-    args = parser.parse_args()
-
-    # Manage params
-    scaffold = args.scaffold
-    base_dir = args.path
-    dbname = args.dbname
-    host = args.host
-    model = args.model
-    userid = args.userid
-    config = args.config
-    outfile = args.outfile
-    required = args.required
-    skeleton = args.skeleton
-    wstored = args.wstored
-    wo2m = args.wo2m
-    wmetadata = args.wmetadata
-    mapsel = args.mapsel
-    wxmlid = args.wxmlid
-    maxdescr = args.maxdescr
-    offline = args.offline
-    append = args.append
-    list = args.list
-    force = args.force
-    verbose = args.verbose
-    version = args.version
-    fieldname = args.fieldname
+    script_extension = '.cmd' if platform.system() == 'Windows' else '.sh'
 
     # Do unit actions
     if version:
@@ -1156,6 +1146,47 @@ def main() -> None:
     if list:
         list_models()
         sys.exit(0)
+
+    if model:
+        model_mapped_name = model.replace('.', '_')
+        if not outfile:
+            outfile = Path(f'{model_mapped_name}.py')
+
+    if create_export_script:
+        if not model:
+            sys.stderr.write("Error: --create-export-script requires -m MODEL to be specified.\n")
+            sys.exit(1)
+        create_export_script_file(model, model_mapped_name, outfile, script_extension)
+        sys.exit(0)
+
+    if export_fields:
+        if not model:
+            sys.stderr.write("Error: --export-fields requires -m MODEL to be specified.\n")
+            sys.exit(1)
+        if not dbname:
+            sys.stderr.write("Error: --export-fields requires a database connection. Please provide -d DBNAME or ensure connection.conf is properly configured.\n")
+            sys.exit(1)
+
+        sys.stdout.write("Generating import-compatible fields...\n")
+        fields = load_fields()
+        exportable_field_names = []
+        for f in fields:
+            # Exclude fields not suitable for direct import
+            if f.name in ('create_uid', 'write_uid'):
+                continue
+            if f.compute:
+                continue
+            if f.related:
+                continue
+            if not f.store:
+                continue
+            if f.type == 'one2many':
+                continue
+            
+            exportable_field_names.append(f.name)
+        
+        sys.stdout.write(",".join(exportable_field_names) + "\n")
+        sys.stdout.write("Import-compatible fields generated.\n")
 
     # If no action set, prompt for scaffolding
     action_args = [scaffold, model]
