@@ -227,7 +227,7 @@ def create_load_script(file: Path) -> None:
             f.write("    printf \"] $runtime \\n\"\n")
             f.write("}\n\n")
             f.write("load_script() {\n")
-            f.write("    # rm -f \$LOGDIR/load_$1_*.log\n")
+            f.write("    # rm -f $LOGDIR/load_$1_*.log")
             f.write("    ./$1.sh > $LOGDIR/load_$1_out.log 2> $LOGDIR/load_$1_err.log &\n")
             f.write("    msg \"$1\"\n")
             f.write("}\n\n")
@@ -1029,7 +1029,7 @@ def scaffold_model() -> None:
         # Add model to clean_data.py
         script = dirname / 'clean_data.py'
         with script.open('a', encoding='utf-8') as f:
-            f.write(f"delete_xml_id(connection, '{model}', f'{{project_name}}_{model_mapped_name}}', demo)\n")
+            f.write("delete_xml_id(connection, '{}', f'{{project_name}}_{}', demo)\n".format(model, model_mapped_name))
         sys.stdout.write(f'Model {model} added in {script}\n')
     else:
         sys.stdout.write(f"You should probably add this model in files.py, prefix.py, clean_data.py, transform{script_extension} and load{script_extension} with -a|--append\n")
