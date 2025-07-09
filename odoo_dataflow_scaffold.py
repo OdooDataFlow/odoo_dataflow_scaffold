@@ -741,7 +741,7 @@ class ModelField:
         elif self.type in ('boolean'):
             return f"mapper.bool_val('{self.get_name()}', true_vals=true_values, false_vals=false_values)"
         elif self.type in ('datetime'):
-            return f"mapper.val('{self.get_name()}', postprocess=lambda x: datetime.strptime(x, 'CSV_DATE_FORMAT').strftime('%%Y-%%m-%%d 00:00:00'))"
+            return f"mapper.val('{self.get_name()}', postprocess=lambda x: datetime.strptime(x, 'CSV_DATE_FORMAT').strftime('%%Y-%%m-%%d 00:00:00') if x else '')"
         elif self.type in ('binary'):
             return f"mapper.binary('{self.get_name()}', data_raw_dir)"
         elif self.type in ('selection'):
