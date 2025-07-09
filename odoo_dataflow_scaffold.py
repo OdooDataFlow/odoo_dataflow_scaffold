@@ -368,7 +368,7 @@ def create_file_clean_data(file: Path) -> None:
         f.write("from odoo_data_flow.lib import conf_lib\n")
         f.write("from prefix import *\n")
         f.write("from files import *\n\n")
-        f.write("connection = conf_lib.get_server_connection(config_file)\n\n")
+        f.write("connection = conf_lib.get_connection_from_config(config_file)\n\n")
         f.write("def delete_model_data(connection, model, demo: bool = False) -> None:\n")
         f.write("    model_model = connection.get_model(model)\n")
         f.write("    record_ids = model_model.search([])\n")
@@ -405,7 +405,7 @@ def create_file_install_lang(file: Path) -> None:
         f.write("from prefix import *\n")
         f.write("from files import *\n")
         f.write("from odoo_data_flow.lib import conf_lib\n\n")
-        f.write("connection = conf_lib.get_server_connection(config_file)\n\n")
+        f.write("connection = conf_lib.get_connection_from_config(config_file)\n\n")
         f.write("model_lang = connection.get_model('base.language.install')\n\n")
         f.write("for key in res_lang_map.keys():\n")
         f.write("    lang = res_lang_map[key]\n")
@@ -429,7 +429,7 @@ def create_file_install_modules(file: Path) -> None:
         f.write("from odoo_data_flow.lib import conf_lib\n")
         f.write("from odoo_data_flow.lib.internal.rpc_thread import RpcThread\n")
         f.write("from files import config_file\n\n")
-        f.write("connection = conf_lib.get_server_connection(config_file)\n\n")
+        f.write("connection = conf_lib.get_connection_from_config(config_file)\n\n")
         f.write("model_module = connection.get_model('ir.module.module')\n")
         f.write("model_module.update_list()\n\n")
         f.write("# Set the modules to install\n")
@@ -459,7 +459,7 @@ def create_file_uninstall_modules(file: Path) -> None:
         f.write("from odoo_data_flow.lib import conf_lib\n")
         f.write("from odoo_data_flow.lib.internal.rpc_thread import RpcThread\n")
         f.write("from files import config_file\n\n")
-        f.write("connection = conf_lib.get_server_connection(config_file)\n\n")
+        f.write("connection = conf_lib.get_connection_from_config(config_file)\n\n")
         f.write("model_module = connection.get_model('ir.module.module')\n")
         f.write("model_module.update_list()\n\n")
         f.write("# Set the modules to uninstall\n")
@@ -486,7 +486,7 @@ def create_file_init_map(file: Path) -> None:
         f.write("from odoo_data_flow.lib import conf_lib\n")
         f.write("import json\n")
         f.write("import io\n\n")
-        f.write("connection = conf_lib.get_server_connection(config_file)\n\n")
+        f.write("connection = conf_lib.get_connection_from_config(config_file)\n\n")
         f.write("def build_map_product_category_id(filename: str = '') -> dict:\n")
         f.write("    # Build a dictionary {product_category : xml_id} of all existing product_category.\n")
         f.write("    model_data = connection.get_model('ir.model.data')\n")
@@ -771,7 +771,7 @@ def load_fields() -> List[ModelField]:
     global has_tracked_fields
     global has_computed_fields
     has_tracked_fields, has_computed_fields = False, False
-    connection = conf_lib.get_server_connection(config)
+    connection = conf_lib.get_connection_from_config(config)
     model_fields = connection.get_model('ir.model.fields')
 
     field_ids = model_fields.search([('model', '=', model)])
@@ -804,7 +804,7 @@ def write_begin(file: io.TextIOWrapper) -> None:
     file.write("# Needed for RPC calls\n")
     file.write("# import odoolib\n")
     file.write("# from odoo_data_flow.lib import conf_lib\n")
-    file.write("# connection = conf_lib.get_server_connection(config_file)\n")
+    file.write("# connection = conf_lib.get_connection_from_config(config_file)\n")
     file.write(f"def preprocess_{model_class_name}(header, data):\n")
     file.write("    # Do nothing\n")
     file.write("    return header, data\n")
@@ -931,7 +931,7 @@ def model_exists(model: str) -> bool:
     Returns:
         True if the model exists, False otherwise.
     """
-    connection = conf_lib.get_server_connection(config)
+    connection = conf_lib.get_connection_from_config(config)
     model_model = connection.get_model('ir.model')
     res = model_model.search_count([('model', '=', model), ('transient', '=', False)])
     return res != 0
@@ -944,7 +944,8 @@ def scaffold_model() -> None:
     global host
     import configparser
     cfg = configparser.ConfigParser(defaults={'protocol': 'xmlrpc', 'port': 8069})
-    cfg.read(config)
+    sys.stdout.write(f"Attempting to read config from: {config.resolve()}\n")
+    cfg.read(str(config))
     host = cfg.get('Connection', 'hostname')
     dbname = cfg.get('Connection', 'database')
     login = cfg.get('Connection', 'login')
@@ -1037,7 +1038,7 @@ def scaffold_model() -> None:
 
 def list_models() -> None:
     """List installed models in the target Odoo instance."""
-    connection = conf_lib.get_server_connection(config)
+    connection = conf_lib.get_connection_from_config(config)
     model_model = connection.get_model('ir.model')
 
     models = model_model.search_read([('transient', '=', False), ('model', '!=', '_unknown')], ['model', 'name'])
@@ -1063,6 +1064,7 @@ def main() -> None:
     global module_name, conf_dir_name, orig_dir_name, data_dir_name, log_dir_name, selection_sep, default_base_dir
     global scaffold, base_dir, dbname, host, model, userid, config, outfile, required, skeleton, wstored, wo2m, wmetadata, mapsel, wxmlid, maxdescr, offline, append, list, force, verbose, version, fieldname
     global script_extension, project_name, model_mapped_name, model_class_name, model_mapping_name, csv_delimiter, default_python_exe, default_path
+    global conf_dir, orig_dir, orig_raw_dir, data_dir, log_dir
 
     module_name = Path(sys.argv[0]).name
     conf_dir_name = 'conf'
