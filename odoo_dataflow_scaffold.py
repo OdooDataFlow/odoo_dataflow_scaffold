@@ -29,12 +29,10 @@ def create_folder(path: Path) -> None:
         path: The path of the folder to create.
     """
     if path.exists() and not force:
-        if verbose:
-            sys.stdout.write(f'Folder {path} already exists.\n')
+        sys.stdout.write(f'Folder {path} already exists.\n')
         return
 
-    if verbose:
-        sys.stdout.write(f'Create folder {path}\n')
+    sys.stdout.write(f'Create folder {path}\n')
     path.mkdir(parents=True, exist_ok=True)
 
 
@@ -51,11 +49,9 @@ def check_file_exists(func: Callable) -> Callable:
     def wrapper(*args, **kwargs):
         file_path = Path(args[0])
         if file_path.is_file() and not force:
-            if verbose:
-                sys.stdout.write(f'File {file_path} already exists.\n')
+            sys.stdout.write(f'File {file_path} already exists.\n')
             return
-        if verbose:
-            sys.stdout.write(f'Create file {file_path}\n')
+        sys.stdout.write(f'Create file {file_path}\n')
         func(*args, **kwargs)
     return wrapper
 
@@ -846,7 +842,7 @@ def write_end(file: io.TextIOWrapper) -> None:
     if ctx_opt:
         ctx = f"'context': {{{', '.join(ctx_opt)}}}, "
 
-    file.write(f"processor.process({model_mapping_name}, dest_{model_mapped_name}, {{'model': '{model}', {ctx}'groupby': '', 'worker': DEFAULT_WORKER, 'batch_size': DEFAULT_BATCH_SIZE}}, 'set', verbose=False)\n\n")
+    file.write(f"processor.process({model_mapping_name}, dest_{model_mapped_name}, {{'model': '{model}', {ctx}'groupby': '', 'worker': DEFAULT_WORKER, 'batch_size': DEFAULT_BATCH_SIZE}}, 'set')\n\n")
     file.write(f"processor.write_to_file('{model_mapped_name}{script_extension}', python_exe='{default_python_exe}', path='{default_path}')\n\n")
 
 
