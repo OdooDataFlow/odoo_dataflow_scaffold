@@ -1347,8 +1347,8 @@ def create_export_script_file(
         f.write("    --config conf/connection.conf \\\n")
         f.write(f'    --model "{model}" \\\n')
         f.write(f'    --file "origin/{model_mapped_name}.csv" \\\n')
-        f.write(f'    --fields "{",".join(field_names)}"\n')
-
+        f.write(f'    --fields "{",".join(field_names)}" \\\n')
+        f.write("    --technical-names\n")
 
     if platform.system() != "Windows":
         export_script_path.chmod(0o755)
