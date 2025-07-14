@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import configparser
 import io
 import os
 import platform
@@ -16,6 +17,37 @@ module_version = "1.4.2"
 offline = False
 dbname = ""
 hostname = ""
+force = False
+data_dir_name = "data"
+log_dir_name = "log"
+conf_dir_name = "conf"
+orig_dir_name = "origin"
+project_name = ""
+model_mapped_name = ""
+selection_sep = ": "
+script_extension = ".cmd" if platform.system() == "Windows" else ".sh"
+default_python_exe = ""
+default_path = ""
+csv_delimiter = ";"
+base_dir = Path(".")
+has_tracked_fields = False
+has_computed_fields = False
+model = ""
+userid = 2
+config = ""
+outfile = ""
+required = False
+skeleton = ""
+wstored = False
+wo2m = False
+wmetadata = False
+mapsel = False
+wxmlid = False
+maxdescr = 10
+append = False
+verbose = False
+fieldname = ""
+
 
 ##############################################################################
 # FUNCTIONS FOR DIRECTORY STRUCTURE
@@ -1422,8 +1454,8 @@ def main() -> None:
 
     - Skeleton a model:
     {module_name} -m MODEL [-a] [--map-selection] [--with-xmlid] [-r] [-k map | -n]
-                            [--with-one2many] [--with-metadata] [--stored] [-v]
-                            [--max-descr MAXDESCR] [-f] [-o OUTFILE] [-c CONFIG]
+                     [--with-one2many] [--with-metadata] [--stored] [-v]
+                     [--max-descr MAXDESCR] [-f] [-o OUTFILE] [-c CONFIG]
 
     - Show available models:
     {module_name} -l [-c CONFIG]
@@ -1636,19 +1668,29 @@ def main() -> None:
     maxdescr = args.maxdescr
     offline = args.offline
     append = args.append
-    create_export_script = args.create_export_script
-    export_fields = args.export_fields
-    list = args.list
+    list_models_flag = args.list
     force = args.force
     verbose = args.verbose
     version = args.version
     fieldname = args.fieldname
+    create_export_script = args.create_export_script
+    export_fields = args.export_fields
 
-    # Do unit actions
+    # --- Start of Corrected Logic ---
+    # 1. Parse config file early to get database name if not provided by CLI
+    if not dbname:
+        config_path = base_dir / config
+        if config_path.is_file():
+            cfg = configparser.ConfigParser()
+            cfg.read(str(config_path))
+            if cfg.has_section("Connection"):
+                dbname = cfg.get("Connection", "database")
+
+    # 2. Now perform actions that require the database name
     if version:
         show_version()
         sys.exit(0)
-    if list:
+    if list_models_flag:
         list_models()
         sys.exit(0)
 
@@ -1700,6 +1742,7 @@ def main() -> None:
 
         sys.stdout.write(",".join(exportable_field_names) + "\n")
         sys.stdout.write("Import-compatible fields generated.\n")
+        sys.exit(0)
 
     # If no action set, prompt for scaffolding
     action_args = [scaffold, model]
