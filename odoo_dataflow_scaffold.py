@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import sys
 import argparse
-import os
-import errno
-import platform
-import odoolib
 import io
+import os
+import platform
 import socket
-from odoo_data_flow.lib import conf_lib
+import sys
 from pathlib import Path
-from typing import List, Dict, Any, Callable, Union
+from typing import Any, Callable, Dict, List
 
-module_version = '1.4.2'
+from odoo_data_flow.lib import conf_lib
+
+module_version = "1.4.2"
 offline = False
-dbname = ''
-hostname = ''
+dbname = ""
+hostname = ""
 
 ##############################################################################
 # FUNCTIONS FOR DIRECTORY STRUCTURE
 ##############################################################################
+
 
 def create_folder(path: Path) -> None:
     """Create a folder only if it doesn't exist or if the flag "force" is set.
@@ -29,10 +29,10 @@ def create_folder(path: Path) -> None:
         path: The path of the folder to create.
     """
     if path.exists() and not force:
-        sys.stdout.write(f'Folder {path} already exists.\n')
+        sys.stdout.write(f"Folder {path} already exists.\n")
         return
 
-    sys.stdout.write(f'Create folder {path}\n')
+    sys.stdout.write(f"Create folder {path}\n")
     path.mkdir(parents=True, exist_ok=True)
 
 
@@ -46,13 +46,15 @@ def check_file_exists(func: Callable) -> Callable:
     Returns:
         The decorated function.
     """
+
     def wrapper(*args, **kwargs):
         file_path = Path(args[0])
         if file_path.is_file() and not force:
-            sys.stdout.write(f'File {file_path} already exists.\n')
+            sys.stdout.write(f"File {file_path} already exists.\n")
             return
-        sys.stdout.write(f'Create file {file_path}\n')
+        sys.stdout.write(f"Create file {file_path}\n")
         func(*args, **kwargs)
+
     return wrapper
 
 
@@ -67,7 +69,16 @@ def is_remote_host(hostname: str) -> bool:
     """
     my_host_name = socket.gethostname()
     my_host_ip = socket.gethostbyname(my_host_name)
-    if any(hostname in x for x in [my_host_name, my_host_ip, socket.getfqdn(), 'localhost', '127.0.0.1']):
+    if any(
+        hostname in x
+        for x in [
+            my_host_name,
+            my_host_ip,
+            socket.getfqdn(),
+            "localhost",
+            "127.0.0.1",
+        ]
+    ):
         return False
     return True
 
@@ -81,9 +92,9 @@ def create_connection_file_local(file: Path) -> None:
         file: The path to the connection file.
     """
     is_remote = is_remote_host(host)
-    protocol = 'jsonrpcs' if is_remote else 'jsonrpc'
-    port = '443' if is_remote else '8069'
-    with file.open('w', encoding='utf-8') as f:
+    protocol = "jsonrpcs" if is_remote else "jsonrpc"
+    port = "443" if is_remote else "8069"
+    with file.open("w", encoding="utf-8") as f:
         f.write("[Connection]\n")
         f.write(f"hostname = {host}\n")
         f.write(f"database = {dbname}\n")
@@ -102,7 +113,7 @@ def create_connection_file_remote(file: Path, hostname: str) -> None:
         file: The path to the connection file.
         hostname: The hostname of the remote server.
     """
-    with file.open('w', encoding='utf-8') as f:
+    with file.open("w", encoding="utf-8") as f:
         f.write("[Connection]\n")
         f.write(f"hostname = {hostname}\n")
         f.write("database = \n")
@@ -120,13 +131,13 @@ def create_cleanup_script(file: Path) -> None:
     Args:
         file: The path to the cleanup script.
     """
-    if platform.system() == 'Windows':
-        with file.open('w', encoding='utf-8') as f:
+    if platform.system() == "Windows":
+        with file.open("w", encoding="utf-8") as f:
             f.write("@echo off\n\n")
             f.write(f"set DIR={data_dir_name}\n")
-            f.write(f"del /F /S /Q %DIR%\\*\n")
+            f.write("del /F /S /Q %DIR%\\*\n")
     else:
-        with file.open('w', encoding='utf-8') as f:
+        with file.open("w", encoding="utf-8") as f:
             f.write("#!/usr/bin/env bash\n\n")
             f.write(f"DIR={data_dir_name}/\n")
             f.write("rm -rf --interactive=never $DIR\n")
@@ -141,16 +152,18 @@ def create_transform_script(file: Path) -> None:
     Args:
         file: The path to the transform script.
     """
-    if platform.system() == 'Windows':
-        with file.open('w', encoding='utf-8') as f:
+    if platform.system() == "Windows":
+        with file.open("w", encoding="utf-8") as f:
             f.write("@echo off\n\n")
             f.write(f"set LOGDIR={log_dir_name}\n")
             f.write(f"set DATADIR={data_dir_name}\n\n")
             f.write("call cleanup_data_dir.cmd\n\n")
             f.write("REM Add here all transform commands\n")
-            f.write("REM python my_model.py > %LOGDIR%\\transform_$1_out.log 2> %LOGDIR%\\transform_$1_err.log\n")
+            f.write(
+                "REM python my_model.py > %LOGDIR%\\transform_$1_out.log 2> %LOGDIR%\\transform_$1_err.log\n"
+            )
     else:
-        with file.open('w', encoding='utf-8') as f:
+        with file.open("w", encoding="utf-8") as f:
             f.write("#!/usr/bin/env bash\n\n")
             f.write(f"LOGDIR={log_dir_name}\n")
             f.write(f"DATADIR={data_dir_name}\n\n")
@@ -159,20 +172,24 @@ def create_transform_script(file: Path) -> None:
             f.write("msg() {\n")
             f.write("    start=$(date +%s.%3N)\n")
             f.write("    PID=$!\n")
-            f.write("    printf \"($PID) Transform ${COLOR}$1${NC} [\"\n")
+            f.write('    printf "($PID) Transform ${COLOR}$1${NC} ["\n')
             f.write("    while kill -0 $PID 2> /dev/null; do\n")
-            f.write("        printf  \"▓\"\n")
+            f.write('        printf  "▓"\n')
             f.write("        sleep 1\n")
             f.write("    done\n")
             f.write("    end=$(date +%s.%3N)\n")
-            f.write("    runtime=$(python -c \"print(f'{int(float(end) - float(start))/60}:{int(float(end) - float(start))%60:02}')\")\n")
-            f.write("    printf \"] $runtime \\n\"\n")
+            f.write(
+                "    runtime=$(python -c \"print(f'{int(float(end) - float(start))/60}:{int(float(end) - float(start))%60:02}')\")\n"
+            )
+            f.write('    printf "] $runtime \\n"\n')
             f.write("}\n\n")
             f.write("load_script() {\n")
             f.write("    #rm -f $DATADIR/*$1*.csv*\n")
             f.write("    rm -f $LOGDIR/transform_$1_*.log\n")
-            f.write("    python $1.py > $LOGDIR/transform_$1_out.log 2> $LOGDIR/transform_$1_err.log &\n")
-            f.write("    msg \"$1\"\n")
+            f.write(
+                "    python $1.py > $LOGDIR/transform_$1_out.log 2> $LOGDIR/transform_$1_err.log &\n"
+            )
+            f.write('    msg "$1"\n')
             f.write("}\n\n")
             f.write("./cleanup_data_dir.sh\n\n")
             f.write("# Add here all transform commands\n")
@@ -188,21 +205,23 @@ def create_load_script(file: Path) -> None:
     Args:
         file: The path to the load script.
     """
-    if platform.system() == 'Windows':
-        with file.open('w', encoding='utf-8') as f:
+    if platform.system() == "Windows":
+        with file.open("w", encoding="utf-8") as f:
             f.write("@echo off\n\n")
             f.write(f"set LOGDIR={log_dir_name}\n\n")
             f.write("REM Add here all load commands\n")
-            f.write("REM my_model.cmd > %LOGDIR%\\load_$1_out.log 2> %LOGDIR%\\load_$1_err.log\n")
+            f.write(
+                "REM my_model.cmd > %LOGDIR%\\load_$1_out.log 2> %LOGDIR%\\load_$1_err.log\n"
+            )
     else:
-        with file.open('w', encoding='utf-8') as f:
+        with file.open("w", encoding="utf-8") as f:
             f.write("#!/usr/bin/env bash\n\n")
             f.write(f"LOGDIR={log_dir_name}\n\n")
             f.write("COLOR='\\033[1;32m'\n")
             f.write("NC='\\033[0m'\n\n")
             f.write("user_interrupt() {\n")
-            f.write("    echo -e \"\\n\\nKeyboard Interrupt detected.\"\n")
-            f.write("    echo -e \"\\nKill import tasks...\"\n")
+            f.write('    echo -e "\\n\\nKeyboard Interrupt detected."\n')
+            f.write('    echo -e "\\nKill import tasks..."\n')
             f.write("    # Kill the current import\n")
             f.write("    killall odoo-import-thread.py\n")
             f.write("    sleep 2\n")
@@ -213,19 +232,23 @@ def create_load_script(file: Path) -> None:
             f.write("msg() {\n")
             f.write("    start=$(date +%s.%3N)\n")
             f.write("    PID=$!\n")
-            f.write("    printf \"($PID) Load ${COLOR}$1${NC} [\"\n")
+            f.write('    printf "($PID) Load ${COLOR}$1${NC} ["\n')
             f.write("    while kill -0 $PID 2> /dev/null; do\n")
-            f.write("        printf  \"▓\"\n")
+            f.write('        printf  "▓"\n')
             f.write("        sleep 1\n")
             f.write("    done\n")
             f.write("    end=$(date +%s.%3N)\n")
-            f.write("    runtime=$(python -c \"print(f'{int(float(end) - float(start))/60}:{int(float(end) - float(start))%60:02}')\")\n")
-            f.write("    printf \"] $runtime \\n\"\n")
+            f.write(
+                "    runtime=$(python -c \"print(f'{int(float(end) - float(start))/60}:{int(float(end) - float(start))%60:02}')\")\n"
+            )
+            f.write('    printf "] $runtime \\n"\n')
             f.write("}\n\n")
             f.write("load_script() {\n")
             f.write("    # rm -f $LOGDIR/load_$1_*.log")
-            f.write("    ./$1.sh > $LOGDIR/load_$1_out.log 2> $LOGDIR/load_$1_err.log &\n")
-            f.write("    msg \"$1\"\n")
+            f.write(
+                "    ./$1.sh > $LOGDIR/load_$1_out.log 2> $LOGDIR/load_$1_err.log &\n"
+            )
+            f.write('    msg "$1"\n')
             f.write("}\n\n")
             f.write("trap user_interrupt SIGINT\n")
             f.write("trap user_interrupt SIGTSTP\n\n")
@@ -241,9 +264,11 @@ def create_file_prefix(file: Path) -> None:
     Args:
         file: The path to the prefix.py file.
     """
-    with file.open('w', encoding='utf-8') as f:
+    with file.open("w", encoding="utf-8") as f:
         f.write("# -*- coding: utf-8 -*-\n\n")
-        f.write("# This file defines xml_id prefixes and projectwise variables.\n\n")
+        f.write(
+            "# This file defines xml_id prefixes and projectwise variables.\n\n"
+        )
         f.write("# Defines here a identifier used in the created XML_ID.\n")
         f.write(f"project_name = '{project_name}'\n")
         f.write("\n")
@@ -253,10 +278,18 @@ def create_file_prefix(file: Path) -> None:
         f.write("# CONSTANTS\n")
         f.write("COMPANY_ID = 'base.main_company'\n")
         f.write("\n")
-        f.write("# Define here all values in client files considered as TRUE value.\n")
-        f.write("true_values = ['TRUE', 'True', 'true', 'YES', 'Yes', 'yes', 'Y', 'y', '1', '1,0', '1.0']\n")
-        f.write("# Define here all values in client files considered as FALSE value.\n")
-        f.write("false_values = ['FALSE', 'False', 'false', 'NO', 'No', 'no', 'N', 'n', '0', '0,0', '0.0']\n")
+        f.write(
+            "# Define here all values in client files considered as TRUE value.\n"
+        )
+        f.write(
+            "true_values = ['TRUE', 'True', 'true', 'YES', 'Yes', 'yes', 'Y', 'y', '1', '1,0', '1.0']\n"
+        )
+        f.write(
+            "# Define here all values in client files considered as FALSE value.\n"
+        )
+        f.write(
+            "false_values = ['FALSE', 'False', 'false', 'NO', 'No', 'no', 'N', 'n', '0', '0,0', '0.0']\n"
+        )
         f.write("\n")
         f.write("# Define the languages used in the import.\n")
         f.write("# These will be installed by calling install_lang.py\n")
@@ -267,6 +300,7 @@ def create_file_prefix(file: Path) -> None:
         f.write("}\n\n")
         f.write("# XML ID PREFIXES\n")
 
+
 @check_file_exists
 def create_file_mapping(file: Path) -> None:
     """Create the skeleton of mapping.py.
@@ -274,7 +308,7 @@ def create_file_mapping(file: Path) -> None:
     Args:
         file: The path to the mapping.py file.
     """
-    with file.open('w', encoding='utf-8') as f:
+    with file.open("w", encoding="utf-8") as f:
         f.write("# -*- coding: utf-8 -*-\n\n")
         f.write("# This file defines mapping dictionaries.\n\n")
         f.write("# MAPPING DICTIONARIES\n")
@@ -289,7 +323,7 @@ def create_file_files(file: Path) -> None:
     Args:
         file: The path to the files.py file.
     """
-    with file.open('w', encoding='utf-8') as f:
+    with file.open("w", encoding="utf-8") as f:
         f.write("# -*- coding: utf-8 -*-\n\n")
         f.write("# This file defines the names of all used files.\n\n")
         f.write("from pathlib import Path\n")
@@ -297,7 +331,7 @@ def create_file_files(file: Path) -> None:
         f.write("# Folders\n")
         f.write(f"conf_dir = Path('{conf_dir_name}')\n")
         f.write(f"data_src_dir = Path('{orig_dir_name}')\n")
-        f.write(f"data_raw_dir = data_src_dir / 'binary'\n")
+        f.write("data_raw_dir = data_src_dir / 'binary'\n")
         f.write(f"data_dest_dir = Path('{data_dir_name}')\n")
         f.write("\n")
         f.write("# Configuration\n")
@@ -306,8 +340,12 @@ def create_file_files(file: Path) -> None:
         f.write("# Declare here all data files\n")
 
         if not model:
-            f.write("# Client file: src_my_model = data_src_dir / 'my_model.csv'\n")
-            f.write("# Import file: dest_my_model = data_dest_dir / 'my.model.csv'\n")
+            f.write(
+                "# Client file: src_my_model = data_src_dir / 'my_model.csv'\n"
+            )
+            f.write(
+                "# Import file: dest_my_model = data_dest_dir / 'my.model.csv'\n"
+            )
 
         f.write("\n")
 
@@ -319,7 +357,7 @@ def create_file_lib(file: Path) -> None:
     Args:
         file: The path to the funclib.py file.
     """
-    with file.open('w', encoding='utf-8') as f:
+    with file.open("w", encoding="utf-8") as f:
         f.write("# -*- coding: utf-8 -*-\n\n")
         f.write("# This file defines common functions.\n\n")
         f.write("from odoo_data_flow.lib import mapper\n")
@@ -336,18 +374,21 @@ def create_file_lib(file: Path) -> None:
         f.write("def keep_letters(val: str) -> str:\n")
         f.write("    return ''.join(filter(str.isalpha, val))\n")
         f.write("\n\n")
-        f.write("# For more complex cases, consider using the `unidecode` library.\n")
+        f.write(
+            "# For more complex cases, consider using the `unidecode` library.\n"
+        )
         f.write("def remove_accents(val: str) -> str:\n")
         f.write("    return val\n")
         f.write("\n\n")
         f.write("def keep_column_value(val, column):\n")
         f.write("    def keep_column_value_fun(line):\n")
         f.write("        if line[column] != val:\n")
-        f.write("            raise SkippingException(f\"Column {column} with wrong value {val}\")\n")
+        f.write(
+            '            raise SkippingException(f"Column {column} with wrong value {val}")\n'
+        )
         f.write("        return line[column]\n")
         f.write("    return keep_column_value_fun\n")
         f.write("\n")
-
 
 
 @check_file_exists
@@ -357,32 +398,48 @@ def create_file_clean_data(file: Path) -> None:
     Args:
         file: The path to the clean_data.py file.
     """
-    with file.open('w', encoding='utf-8') as f:
+    with file.open("w", encoding="utf-8") as f:
         f.write("# -*- coding: utf-8 -*-\n\n")
         f.write("# This script remove the data created by the import.\n\n")
         f.write("import odoolib\n")
         f.write("from odoo_data_flow.lib import conf_lib\n")
         f.write("from prefix import *\n")
         f.write("from files import *\n\n")
-        f.write("connection = conf_lib.get_connection_from_config(config_file)\n\n")
-        f.write("def delete_model_data(connection, model, demo: bool = False) -> None:\n")
+        f.write(
+            "connection = conf_lib.get_connection_from_config(config_file)\n\n"
+        )
+        f.write(
+            "def delete_model_data(connection, model, demo: bool = False) -> None:\n"
+        )
         f.write("    model_model = connection.get_model(model)\n")
         f.write("    record_ids = model_model.search([])\n")
         f.write("    if demo:\n")
-        f.write("        print(f'Will remove {len(record_ids)} records from {model}')\n")
+        f.write(
+            "        print(f'Will remove {len(record_ids)} records from {model}')\n"
+        )
         f.write("    else:\n")
-        f.write("        print(f'Remove {len(record_ids)} records from {model}')\n")
+        f.write(
+            "        print(f'Remove {len(record_ids)} records from {model}')\n"
+        )
         f.write("        model_model.unlink(record_ids)\n")
         f.write("\n\n")
-        f.write("def delete_xml_id(connection, model, module, demo: bool = False) -> None:\n")
+        f.write(
+            "def delete_xml_id(connection, model, module, demo: bool = False) -> None:\n"
+        )
         f.write("    data_model = connection.get_model('ir.model.data')\n")
-        f.write("    data_ids = data_model.search([('module', '=', module), ('model', '=', model)])\n")
+        f.write(
+            "    data_ids = data_model.search([('module', '=', module), ('model', '=', model)])\n"
+        )
         f.write("    records = data_model.read(data_ids, ['res_id'])\n")
         f.write("    record_ids = [rec['res_id'] for rec in records]\n")
         f.write("    if demo:\n")
-        f.write("        print(f'Will remove {len(record_ids)} xml_id {module} from {model}')\n")
+        f.write(
+            "        print(f'Will remove {len(record_ids)} xml_id {module} from {model}')\n"
+        )
         f.write("    else:\n")
-        f.write("        print(f'Remove {len(record_ids)} xml_id {module} from {model}')\n")
+        f.write(
+            "        print(f'Remove {len(record_ids)} xml_id {module} from {model}')\n"
+        )
         f.write("        connection.get_model(model).unlink(record_ids)\n")
         f.write("\n\n")
         f.write("demo = True\n\n")
@@ -395,14 +452,18 @@ def create_file_install_lang(file: Path) -> None:
     Args:
         file: The path to the install_lang.py file.
     """
-    with file.open('w', encoding='utf-8') as f:
+    with file.open("w", encoding="utf-8") as f:
         f.write("# -*- coding: utf-8 -*-\n\n")
         f.write("import odoolib\n")
         f.write("from prefix import *\n")
         f.write("from files import *\n")
         f.write("from odoo_data_flow.lib import conf_lib\n\n")
-        f.write("connection = conf_lib.get_connection_from_config(config_file)\n\n")
-        f.write("model_lang = connection.get_model('base.language.install')\n\n")
+        f.write(
+            "connection = conf_lib.get_connection_from_config(config_file)\n\n"
+        )
+        f.write(
+            "model_lang = connection.get_model('base.language.install')\n\n"
+        )
         f.write("for key in res_lang_map.keys():\n")
         f.write("    lang = res_lang_map[key]\n")
         f.write("    res = model_lang.create({'lang': lang})\n")
@@ -416,27 +477,37 @@ def create_file_install_modules(file: Path) -> None:
     Args:
         file: The path to the install_modules.py file.
     """
-    with file.open('w', encoding='utf-8') as f:
+    with file.open("w", encoding="utf-8") as f:
         f.write("# -*- coding: utf-8 -*-\n\n")
         f.write("import sys\n")
         f.write("import odoolib\n")
         f.write("from prefix import *\n")
         f.write("from files import *\n")
         f.write("from odoo_data_flow.lib import conf_lib\n")
-        f.write("from odoo_data_flow.lib.internal.rpc_thread import RpcThread\n")
+        f.write(
+            "from odoo_data_flow.lib.internal.rpc_thread import RpcThread\n"
+        )
         f.write("from files import config_file\n\n")
-        f.write("connection = conf_lib.get_connection_from_config(config_file)\n\n")
+        f.write(
+            "connection = conf_lib.get_connection_from_config(config_file)\n\n"
+        )
         f.write("model_module = connection.get_model('ir.module.module')\n")
         f.write("model_module.update_list()\n\n")
         f.write("# Set the modules to install\n")
         f.write("module_names = []\n\n")
-        f.write("module_ids = model_module.search_read([['name', 'in', module_names]])\n\n")
+        f.write(
+            "module_ids = model_module.search_read([['name', 'in', module_names]])\n\n"
+        )
         f.write("rpc_thread = RpcThread(1)\n\n")
         f.write("for module in module_ids:\n")
         f.write("    if module['state'] == 'installed':\n")
-        f.write("        rpc_thread.spawn_thread(model_module.button_immediate_upgrade, [module['id']])\n")
+        f.write(
+            "        rpc_thread.spawn_thread(model_module.button_immediate_upgrade, [module['id']])\n"
+        )
         f.write("    else:\n")
-        f.write("        rpc_thread.spawn_thread(model_module.button_immediate_install, [module['id']])\n")
+        f.write(
+            "        rpc_thread.spawn_thread(model_module.button_immediate_install, [module['id']])\n"
+        )
 
 
 @check_file_exists
@@ -446,25 +517,33 @@ def create_file_uninstall_modules(file: Path) -> None:
     Args:
         file: The path to the uninstall_modules.py file.
     """
-    with file.open('w', encoding='utf-8') as f:
+    with file.open("w", encoding="utf-8") as f:
         f.write("# -*- coding: utf-8 -*-\n\n")
         f.write("import sys\n")
         f.write("import odoolib\n")
         f.write("from prefix import *\n")
         f.write("from files import *\n")
         f.write("from odoo_data_flow.lib import conf_lib\n")
-        f.write("from odoo_data_flow.lib.internal.rpc_thread import RpcThread\n")
+        f.write(
+            "from odoo_data_flow.lib.internal.rpc_thread import RpcThread\n"
+        )
         f.write("from files import config_file\n\n")
-        f.write("connection = conf_lib.get_connection_from_config(config_file)\n\n")
+        f.write(
+            "connection = conf_lib.get_connection_from_config(config_file)\n\n"
+        )
         f.write("model_module = connection.get_model('ir.module.module')\n")
         f.write("model_module.update_list()\n\n")
         f.write("# Set the modules to uninstall\n")
         f.write("module_names = []\n\n")
-        f.write("module_ids = model_module.search_read([['name', 'in', module_names]])\n\n")
+        f.write(
+            "module_ids = model_module.search_read([['name', 'in', module_names]])\n\n"
+        )
         f.write("rpc_thread = RpcThread(1)\n\n")
         f.write("for module in module_ids:\n")
         f.write("    if module['state'] == 'installed':\n")
-        f.write("        rpc_thread.spawn_thread(model_module.button_immediate_uninstall, [module['id']])\n")
+        f.write(
+            "        rpc_thread.spawn_thread(model_module.button_immediate_uninstall, [module['id']])\n"
+        )
 
 
 @check_file_exists
@@ -474,7 +553,7 @@ def create_file_init_map(file: Path) -> None:
     Args:
         file: The path to the init_map.py file.
     """
-    with file.open('w', encoding='utf-8') as f:
+    with file.open("w", encoding="utf-8") as f:
         f.write("# -*- coding: utf-8 -*-\n\n")
         f.write("import odoolib\n")
         f.write("from prefix import *\n")
@@ -482,56 +561,98 @@ def create_file_init_map(file: Path) -> None:
         f.write("from odoo_data_flow.lib import conf_lib\n")
         f.write("import json\n")
         f.write("import io\n\n")
-        f.write("connection = conf_lib.get_connection_from_config(config_file)\n\n")
-        f.write("def build_map_product_category_id(filename: str = '') -> dict:\n")
-        f.write("    # Build a dictionary {product_category : xml_id} of all existing product_category.\n")
+        f.write(
+            "connection = conf_lib.get_connection_from_config(config_file)\n\n"
+        )
+        f.write(
+            "def build_map_product_category_id(filename: str = '') -> dict:\n"
+        )
+        f.write(
+            "    # Build a dictionary {product_category : xml_id} of all existing product_category.\n"
+        )
         f.write("    model_data = connection.get_model('ir.model.data')\n")
-        f.write("    model_product_category = connection.get_model('product.category')\n")
-        f.write("    recs = model_product_category.search_read([], ['id', 'name'])\n\n")
+        f.write(
+            "    model_product_category = connection.get_model('product.category')\n"
+        )
+        f.write(
+            "    recs = model_product_category.search_read([], ['id', 'name'])\n\n"
+        )
         f.write("    res_map = {}\n")
         f.write("    for rec in recs:\n")
-        f.write("        data = model_data.search_read([('res_id', '=', rec['id']), ('model', '=', 'product.category')], ['module', 'name'])\n")
+        f.write(
+            "        data = model_data.search_read([('res_id', '=', rec['id']), ('model', '=', 'product.category')], ['module', 'name'])\n"
+        )
         f.write("        if len(data):\n")
         f.write("            key = rec['name'].strip()\n")
-        f.write("            val = '.'.join([data[0]['module'], data[0]['name'] ])\n")
+        f.write(
+            "            val = '.'.join([data[0]['module'], data[0]['name'] ])\n"
+        )
         f.write("            res_map[key] = val.strip()\n")
         f.write("        # else:\n")
-        f.write("        #     print(f'Product category {rec['name']} has no XML_ID (id: {rec['id']})')\n\n")
+        f.write(
+            "        #     print(f'Product category {rec['name']} has no XML_ID (id: {rec['id']})')\n\n"
+        )
         f.write("    if filename:\n")
         f.write("        with open(filename, 'w') as fp:\n")
         f.write("            json.dump(res_map, fp)\n\n")
         f.write("    return res_map\n\n")
         f.write("# Execute mapping\n")
-        f.write("# dummy = build_map_product_category_id(work_map_product_category_id)\n\n")
+        f.write(
+            "# dummy = build_map_product_category_id(work_map_product_category_id)\n\n"
+        )
         f.write("# Add in files.py\n")
-        f.write("# work_map_product_category_id = data_src_dir / 'work_map_product_category_id.json'\n\n")
+        f.write(
+            "# work_map_product_category_id = data_src_dir / 'work_map_product_category_id.json'\n\n"
+        )
         f.write("# Add in transformation script\n")
         f.write("# map_product_category_id = {}\n")
-        f.write("# with io.open(work_map_product_category_id, 'r', encoding='utf-8') as fp:\n")
+        f.write(
+            "# with io.open(work_map_product_category_id, 'r', encoding='utf-8') as fp:\n"
+        )
         f.write("#     map_product_category_id = json.load(fp)\n\n")
-        f.write("# Add in transformation script to map 'id' column. REVIEW COLUNM NAME and PREFIX\n")
+        f.write(
+            "# Add in transformation script to map 'id' column. REVIEW COLUNM NAME and PREFIX\n"
+        )
         f.write("# def handle_product_category_id(line):\n")
         f.write("#     categ_name = line['Product Category']\n")
         f.write("#     try:\n")
-        f.write("#         categ_xml_id = map_product_category_id[categ_name]\n")
+        f.write(
+            "#         categ_xml_id = map_product_category_id[categ_name]\n"
+        )
         f.write("#     except:\n")
-        f.write("#         categ_xml_id = mapper.m2o(PREFIX_PRODUCT_CATEGORY, 'Product Category')(line)\n")
+        f.write(
+            "#         categ_xml_id = mapper.m2o(PREFIX_PRODUCT_CATEGORY, 'Product Category')(line)\n"
+        )
         f.write("#     return categ_xml_id\n\n")
-        f.write("##################################################################################################\n\n")
-        f.write("def build_account_map(company_id: int, filename: str = '') -> dict:\n")
-        f.write("    # Build a dictionary {account_code : xml_id} of all existing accounts of a company.\n")
+        f.write(
+            "##################################################################################################\n\n"
+        )
+        f.write(
+            "def build_account_map(company_id: int, filename: str = '') -> dict:\n"
+        )
+        f.write(
+            "    # Build a dictionary {account_code : xml_id} of all existing accounts of a company.\n"
+        )
         f.write("    model_data = connection.get_model('ir.model.data')\n")
         f.write("    model_account = connection.get_model('account.account')\n")
-        f.write("    recs = model_account.search_read([('company_id', '=', company_id)], ['id', 'code'])\n\n")
+        f.write(
+            "    recs = model_account.search_read([('company_id', '=', company_id)], ['id', 'code'])\n\n"
+        )
         f.write("    res_map = {}\n")
         f.write("    for rec in recs:\n")
-        f.write("        data = model_data.search_read([('res_id', '=', rec['id']), ('model', '=', 'account.account')], ['module', 'name'])\n")
+        f.write(
+            "        data = model_data.search_read([('res_id', '=', rec['id']), ('model', '=', 'account.account')], ['module', 'name'])\n"
+        )
         f.write("        if len(data):\n")
         f.write("            key = rec['code'].strip()\n")
-        f.write("            val = '.'.join([data[0]['module'], data[0]['name'] ])\n")
+        f.write(
+            "            val = '.'.join([data[0]['module'], data[0]['name'] ])\n"
+        )
         f.write("            res_map[key] = val.strip()\n")
         f.write("        # else:\n")
-        f.write("        #     print(f'Account {rec['code']} has no XML_ID')\n\n")
+        f.write(
+            "        #     print(f'Account {rec['code']} has no XML_ID')\n\n"
+        )
         f.write("    if filename:\n")
         f.write("        with open(filename, 'w') as fp:\n")
         f.write("            json.dump(res_map, fp)\n\n")
@@ -539,20 +660,30 @@ def create_file_init_map(file: Path) -> None:
         f.write("# Execute mapping\n")
         f.write("# dummy = build_account_map(1, work_map_account_code_id)\n\n")
         f.write("# Add in files.py\n")
-        f.write("# work_map_account_code_id = data_src_dir / 'work_map_account_code_id.json'\n\n")
+        f.write(
+            "# work_map_account_code_id = data_src_dir / 'work_map_account_code_id.json'\n\n"
+        )
         f.write("# Add in transformation script\n")
         f.write("# map_account_code_id = {}\n")
-        f.write("# with io.open(work_map_account_code_id, 'r', encoding='utf-8') as fp:\n")
+        f.write(
+            "# with io.open(work_map_account_code_id, 'r', encoding='utf-8') as fp:\n"
+        )
         f.write("#     map_account_code_id = json.load(fp)\n\n")
-        f.write("# Add in transformation script to map 'id' column. REVIEW COLUNM NAME and PREFIX\n")
+        f.write(
+            "# Add in transformation script to map 'id' column. REVIEW COLUNM NAME and PREFIX\n"
+        )
         f.write("# def handle_account_account_id_map(line):\n")
         f.write("#     code = line['Accounts']\n")
         f.write("#     try:\n")
         f.write("#         val = map_account_code_id[code]\n")
         f.write("#     except:\n")
-        f.write("#         val = mapper.m2o(PREFIX_ACCOUNT_ACCOUNT, 'Accounts')(line)\n")
+        f.write(
+            "#         val = mapper.m2o(PREFIX_ACCOUNT_ACCOUNT, 'Accounts')(line)\n"
+        )
         f.write("#     return val\n\n")
-        f.write("##################################################################################################\n\n")
+        f.write(
+            "##################################################################################################\n\n"
+        )
 
 
 def scaffold_dir() -> None:
@@ -563,29 +694,37 @@ def scaffold_dir() -> None:
     create_folder(Path(data_dir))
     create_folder(Path(log_dir))
 
-    create_connection_file_local(Path(conf_dir) / 'connection.conf')
-    create_connection_file_local(Path(conf_dir) / 'connection.local')
-    create_connection_file_remote(Path(conf_dir) / 'connection.staging', '.dev.odoo.com')
-    create_connection_file_remote(Path(conf_dir) / 'connection.master', '.odoo.com')
+    create_connection_file_local(Path(conf_dir) / "connection.conf")
+    create_connection_file_local(Path(conf_dir) / "connection.local")
+    create_connection_file_remote(
+        Path(conf_dir) / "connection.staging", ".dev.odoo.com"
+    )
+    create_connection_file_remote(
+        Path(conf_dir) / "connection.master", ".odoo.com"
+    )
 
-    create_cleanup_script(Path(base_dir) / f'cleanup_data_dir{script_extension}')
-    create_transform_script(Path(base_dir) / f'transform{script_extension}')
-    create_load_script(Path(base_dir) / f'load{script_extension}')
-    create_file_prefix(Path(base_dir) / 'prefix.py')
-    create_file_mapping(Path(base_dir) / 'mapping.py')
-    create_file_files(Path(base_dir) / 'files.py')
-    create_file_lib(Path(base_dir) / 'funclib.py')
-    create_file_clean_data(Path(base_dir) / 'clean_data.py')
-    create_file_install_lang(Path(base_dir) / 'install_lang.py')
-    create_file_install_modules(Path(base_dir) / 'install_modules.py')
-    create_file_uninstall_modules(Path(base_dir) / 'uninstall_modules.py')
-    create_file_init_map(Path(base_dir) / 'init_map.py')
+    create_cleanup_script(
+        Path(base_dir) / f"cleanup_data_dir{script_extension}"
+    )
+    create_transform_script(Path(base_dir) / f"transform{script_extension}")
+    create_load_script(Path(base_dir) / f"load{script_extension}")
+    create_file_prefix(Path(base_dir) / "prefix.py")
+    create_file_mapping(Path(base_dir) / "mapping.py")
+    create_file_files(Path(base_dir) / "files.py")
+    create_file_lib(Path(base_dir) / "funclib.py")
+    create_file_clean_data(Path(base_dir) / "clean_data.py")
+    create_file_install_lang(Path(base_dir) / "install_lang.py")
+    create_file_install_modules(Path(base_dir) / "install_modules.py")
+    create_file_uninstall_modules(Path(base_dir) / "uninstall_modules.py")
+    create_file_init_map(Path(base_dir) / "init_map.py")
 
     sys.stdout.write(f"Project created in {Path(base_dir).resolve()}\n")
+
 
 ##############################################################################
 # FUNCTIONS FOR MODEL SKELETON CODE
 ##############################################################################
+
 
 class ModelField:
     """Manages how to get a suited mapper function and how to document itself.
@@ -594,32 +733,33 @@ class ModelField:
         connection: The Odoo connection object.
         properties: A dictionary of field properties.
     """
+
     def __init__(self, connection: Any, properties: Dict[str, Any]) -> None:
         self.connection = connection
         self.properties = properties
         self.import_warn_msg: List[str] = []
-        self.id: int = properties.get('id')
-        self.name: str = properties.get('name')
-        self.type: str = properties.get('ttype')
-        self.required: bool = properties.get('required')
-        self.readonly: bool = properties.get('readonly')
-        self.string: str = properties.get('field_description')
-        self.store: bool = properties.get('store')
-        self.track_visibility: str = properties.get('track_visibility')
-        self.related: str = properties.get('related')
-        self.relation: str = properties.get('relation')
-        self.depends: str = properties.get('depends')
+        self.id: int = properties.get("id")
+        self.name: str = properties.get("name")
+        self.type: str = properties.get("ttype")
+        self.required: bool = properties.get("required")
+        self.readonly: bool = properties.get("readonly")
+        self.string: str = properties.get("field_description")
+        self.store: bool = properties.get("store")
+        self.track_visibility: str = properties.get("track_visibility")
+        self.related: str = properties.get("related")
+        self.relation: str = properties.get("relation")
+        self.depends: str = properties.get("depends")
         self.compute: List[str] = self._get_compute()
         self.selection: List[str] = self._get_selection()
         self.default_value: List[str] = self._get_default()
 
         # Reasons avoiding to import a field -> commented by get_info
         if self.related and self.store:
-            self.import_warn_msg.append('related stored')
+            self.import_warn_msg.append("related stored")
         if not self.store and not self.related:
-            self.import_warn_msg.append('non stored')
+            self.import_warn_msg.append("non stored")
         if len(self.compute) > 1:
-            self.import_warn_msg.append('computed')
+            self.import_warn_msg.append("computed")
 
     def _get_selection(self) -> List[str]:
         """Fetch the selection values of a field.
@@ -631,7 +771,11 @@ class ModelField:
         selection_list = []
         model_model = self.connection.get_model(model)
         try:
-            vals = model_model.fields_get([self.name]).get(self.name).get('selection')
+            vals = (
+                model_model.fields_get([self.name])
+                .get(self.name)
+                .get("selection")
+            )
             if not vals:
                 return selection_list
             for sel in vals:
@@ -648,11 +792,11 @@ class ModelField:
             or an empty list if no default value exists.
         """
         model_model = self.connection.get_model(model)
-        val = model_model.default_get([self.name]).get(self.name, '')
+        val = model_model.default_get([self.name]).get(self.name, "")
         lines = str(val).splitlines()
 
         if maxdescr > -1 and len(lines) > max(1, maxdescr):
-            lines = lines[:maxdescr] + ['[truncated...]']
+            lines = lines[:maxdescr] + ["[truncated...]"]
 
         return lines
 
@@ -663,11 +807,11 @@ class ModelField:
             A list of strings (because the compute method is often a multiline value)
             or an empty list if no compute method exists.
         """
-        val = self.properties.get('compute')
+        val = self.properties.get("compute")
         lines = str(val).splitlines()
 
         if maxdescr > -1 and len(lines) > maxdescr:
-            lines = lines[:maxdescr] + ['[truncated...]']
+            lines = lines[:maxdescr] + ["[truncated...]"]
 
         return lines
 
@@ -690,9 +834,9 @@ class ModelField:
         if self.relation:
             info += f" -> {self.relation}"
             # Add XMLID summary in field info
-            model_data = self.connection.get_model('ir.model.data')
+            model_data = self.connection.get_model("ir.model.data")
             external_prefixes = model_data.read_group(
-                [('model', '=', self.relation)], ['module'], ['module']
+                [("model", "=", self.relation)], ["module"], ["module"]
             )
             if external_prefixes:
                 info += " - with xml_id in module(s):"
@@ -712,42 +856,48 @@ class ModelField:
             info += f"\n    # COMPUTE: depends on {self.depends}\n    # {'\n    # '.join(self.compute)}"
 
         if self.import_warn_msg:
-            info += f"\n    # AVOID THIS FIELD: {', '.join(self.import_warn_msg)}"
+            info += (
+                f"\n    # AVOID THIS FIELD: {', '.join(self.import_warn_msg)}"
+            )
 
         return info
 
     def get_name(self) -> str:
         """Returns the technical or user-friendly name of the field."""
-        return self.name if fieldname == 'tech' else self.string
+        return self.name if fieldname == "tech" else self.string
 
     def get_mapping_name(self) -> str:
         """Return the field name as needed in the import file."""
-        return f"{self.name}/id" if self.type in ('many2one', 'many2many') else self.name
+        return (
+            f"{self.name}/id"
+            if self.type in ("many2one", "many2many")
+            else self.name
+        )
 
     def get_mapper_command(self) -> str:
         """Return a suited mapper function according to the field properties and skeleton options."""
-        if self.name == 'id':
+        if self.name == "id":
             if wxmlid:
                 return f"mapper.val('{self.name}')"
             else:
                 return "mapper.m2o_map(OBJECT_XMLID_PREFIX, mapper.concat('_', 'CSV_COLUMN1','CSV_COLUMN2'))"
 
-        elif self.type in ('integer', 'float', 'monetary'):
+        elif self.type in ("integer", "float", "monetary"):
             return f"mapper.num('{self.get_name()}')"
-        elif self.type in ('boolean'):
+        elif self.type in ("boolean"):
             return f"mapper.bool_val('{self.get_name()}', true_values=true_values, false_values=false_values)"
-        elif self.type in ('datetime'):
+        elif self.type in ("datetime"):
             return f"mapper.val('{self.get_name()}', postprocess=lambda x: datetime.strptime(x, 'CSV_DATE_FORMAT').strftime('%%Y-%%m-%%d 00:00:00') if x else '')"
-        elif self.type in ('binary'):
+        elif self.type in ("binary"):
             return f"mapper.binary('{self.get_name()}', data_raw_dir)"
-        elif self.type in ('selection'):
+        elif self.type in ("selection"):
             if mapsel:
                 return f"mapper.map_val('{self.get_name()}', {model_mapped_name}_{self.name}_map)"
             else:
                 return f"mapper.val('{self.get_name()}')"
-        elif self.type in ('many2many') and not wxmlid:
+        elif self.type in ("many2many") and not wxmlid:
             return f"mapper.m2m(PREFIX_{self.relation.replace('.', '_').upper()}, '{self.get_name()}')"
-        elif self.type in ('many2one', 'one2many', 'many2many') and not wxmlid:
+        elif self.type in ("many2one", "one2many", "many2many") and not wxmlid:
             return f"mapper.m2o(PREFIX_{self.relation.replace('.', '_').upper()}, '{self.get_name()}')"
 
         else:
@@ -768,9 +918,9 @@ def load_fields() -> List[ModelField]:
     global has_computed_fields
     has_tracked_fields, has_computed_fields = False, False
     connection = conf_lib.get_connection_from_config(config)
-    model_fields = connection.get_model('ir.model.fields')
+    model_fields = connection.get_model("ir.model.fields")
 
-    field_ids = model_fields.search([('model', '=', model)])
+    field_ids = model_fields.search([("model", "=", model)])
     fields = model_fields.read(field_ids)
     ret = []
     for field in fields:
@@ -800,7 +950,9 @@ def write_begin(file: io.TextIOWrapper) -> None:
     file.write("# Needed for RPC calls\n")
     file.write("# import odoolib\n")
     file.write("# from odoo_data_flow.lib import conf_lib\n")
-    file.write("# connection = conf_lib.get_connection_from_config(config_file)\n")
+    file.write(
+        "# connection = conf_lib.get_connection_from_config(config_file)\n"
+    )
     file.write(f"def preprocess_{model_class_name}(header, data):\n")
     file.write("    # Do nothing\n")
     file.write("    return header, data\n")
@@ -818,7 +970,9 @@ def write_begin(file: io.TextIOWrapper) -> None:
     file.write("    #         data_new.append(j)\n")
     file.write("    # return header, data_new\n")
     file.write("\n")
-    file.write(f"processor = Processor(src_{model_mapped_name}, delimiter='{csv_delimiter}', preprocess=preprocess_{model_class_name})\n")
+    file.write(
+        f"processor = Processor(src_{model_mapped_name}, delimiter='{csv_delimiter}', preprocess=preprocess_{model_class_name})\n"
+    )
     file.write("\n")
 
 
@@ -828,7 +982,7 @@ def write_end(file: io.TextIOWrapper) -> None:
     Args:
         file: The file object to write to.
     """
-    ctx = ''
+    ctx = ""
     ctx_opt = []
 
     if dbname and not offline:
@@ -842,8 +996,12 @@ def write_end(file: io.TextIOWrapper) -> None:
     if ctx_opt:
         ctx = f"'context': {{{', '.join(ctx_opt)}}}, "
 
-    file.write(f"processor.process({model_mapping_name}, dest_{model_mapped_name}, {{'model': '{model}', {ctx}'groupby': '', 'worker': DEFAULT_WORKER, 'batch_size': DEFAULT_BATCH_SIZE}}, 'set')\n\n")
-    file.write(f"processor.write_to_file('{model_mapped_name}{script_extension}', python_exe='{default_python_exe}', path='{default_path}')\n\n")
+    file.write(
+        f"processor.process({model_mapping_name}, dest_{model_mapped_name}, {{'model': '{model}', {ctx}'groupby': '', 'worker': DEFAULT_WORKER, 'batch_size': DEFAULT_BATCH_SIZE}}, 'set')\n\n"
+    )
+    file.write(
+        f"processor.write_to_file('{model_mapped_name}{script_extension}', python_exe='{default_python_exe}', path='{default_path}')\n\n"
+    )
 
 
 def write_mapping(file: io.TextIOWrapper) -> None:
@@ -859,62 +1017,94 @@ def write_mapping(file: io.TextIOWrapper) -> None:
     fields = load_fields()
 
     def field_filter(f: ModelField) -> bool:
-        if f.name == '__last_update':
+        if f.name == "__last_update":
             return False
         if wstored and not f.store:
             return False
-        if not wo2m and f.type == 'one2many':
+        if not wo2m and f.type == "one2many":
             return False
-        if not wmetadata and f.name in ('create_uid', 'write_uid', 'create_date', 'write_date', 'active'):
+        if not wmetadata and f.name in (
+            "create_uid",
+            "write_uid",
+            "create_date",
+            "write_date",
+            "active",
+        ):
             return False
         return True
 
     fields = filter(field_filter, fields)
-    fields = sorted(fields, key=lambda f: ((f.name != 'id'), not f.is_required(), f.name))
+    fields = sorted(
+        fields, key=lambda f: ((f.name != "id"), not f.is_required(), f.name)
+    )
 
-    if skeleton == 'dict':
-        file.write(f'{model_mapping_name} = {{\n')
+    if skeleton == "dict":
+        file.write(f"{model_mapping_name} = {{\n")
         for f in fields:
             if verbose:
-                sys.stdout.write(f'Write field {f.name}\n')
-            line_start = '# ' if (required and not f.is_required() and f.name != 'id') or f.import_warn_msg else ''
+                sys.stdout.write(f"Write field {f.name}\n")
+            line_start = (
+                "# "
+                if (required and not f.is_required() and f.name != "id")
+                or f.import_warn_msg
+                else ""
+            )
             file.write(f"    # {f.get_info()}\n")
-            mapper_command = f.get_mapper_command().replace('OBJECT_XMLID_PREFIX', f'PREFIX_{model_mapped_name.upper()}')
-            file.write(f"    {line_start}'{f.get_mapping_name()}': {mapper_command},\n")
-        file.write('}\n\n')
+            mapper_command = f.get_mapper_command().replace(
+                "OBJECT_XMLID_PREFIX", f"PREFIX_{model_mapped_name.upper()}"
+            )
+            file.write(
+                f"    {line_start}'{f.get_mapping_name()}': {mapper_command},\n"
+            )
+        file.write("}\n\n")
 
-    elif skeleton == 'map':
-        function_prefix = f'handle_{model_mapped_name}_'
+    elif skeleton == "map":
+        function_prefix = f"handle_{model_mapped_name}_"
         for f in fields:
             if verbose:
-                sys.stdout.write(f'Write map function of field {f.name}\n')
-            line_start = '# ' if (required and not f.is_required()) or f.import_warn_msg else ''
-            mapper_command = f.get_mapper_command().replace('OBJECT_XMLID_PREFIX', f'PREFIX_{model_mapped_name.upper()}')
+                sys.stdout.write(f"Write map function of field {f.name}\n")
+            line_start = (
+                "# "
+                if (required and not f.is_required()) or f.import_warn_msg
+                else ""
+            )
+            mapper_command = f.get_mapper_command().replace(
+                "OBJECT_XMLID_PREFIX", f"PREFIX_{model_mapped_name.upper()}"
+            )
             file.write(f"{line_start}def {function_prefix}{f.name}(line):\n")
             file.write(f"{line_start}    return {mapper_command}(line)\n\n")
 
-        file.write(f'{model_mapping_name} = {{\n')
+        file.write(f"{model_mapping_name} = {{\n")
         for f in fields:
             if verbose:
-                sys.stdout.write(f'Write field {f.name}\n')
-            line_start = '# ' if (required and not f.is_required() and f.name != 'id') or f.import_warn_msg else ''
+                sys.stdout.write(f"Write field {f.name}\n")
+            line_start = (
+                "# "
+                if (required and not f.is_required() and f.name != "id")
+                or f.import_warn_msg
+                else ""
+            )
             file.write(f"    # {f.get_info()}\n")
-            file.write(f"    {line_start}'{f.get_mapping_name()}': {function_prefix}{f.name},\n")
-        file.write('}\n\n')
+            file.write(
+                f"    {line_start}'{f.get_mapping_name()}': {function_prefix}{f.name},\n"
+            )
+        file.write("}\n\n")
 
     # Add selection dictionaries if --map-selection
     if mapsel:
         if verbose:
-            sys.stdout.write('Write mapping of selection fields\n')
-        with open(Path(base_dir) / 'mapping.py', 'a', encoding='utf-8') as pf:
+            sys.stdout.write("Write mapping of selection fields\n")
+        with open(Path(base_dir) / "mapping.py", "a", encoding="utf-8") as pf:
             pf.write(f"# Selection fields in model {model}\n\n")
-            for f in filter(lambda x: x.type == 'selection', fields):
-                sys.stdout.write(f'Write mapping of selection field {f.name}\n')
-                line_start = '# ' if (required and not f.is_required()) else ''
+            for f in filter(lambda x: x.type == "selection", fields):
+                sys.stdout.write(f"Write mapping of selection field {f.name}\n")
+                line_start = "# " if (required and not f.is_required()) else ""
                 pf.write(f"{line_start}{model_mapped_name}_{f.name}_map = {{\n")
                 for sel in f.selection:
                     key, val = sel.split(selection_sep)
-                    pf.write(f'{line_start}    "{val.strip()}": {key.strip()},\n')
+                    pf.write(
+                        f'{line_start}    "{val.strip()}": {key.strip()},\n'
+                    )
                 pf.write(f"{line_start}}}\n\n")
 
 
@@ -928,8 +1118,10 @@ def model_exists(model: str) -> bool:
         True if the model exists, False otherwise.
     """
     connection = conf_lib.get_connection_from_config(config)
-    model_model = connection.get_model('ir.model')
-    res = model_model.search_count([('model', '=', model), ('transient', '=', False)])
+    model_model = connection.get_model("ir.model")
+    res = model_model.search_count(
+        [("model", "=", model), ("transient", "=", False)]
+    )
     return res != 0
 
 
@@ -939,14 +1131,19 @@ def scaffold_model() -> None:
     global dbname
     global host
     import configparser
-    cfg = configparser.ConfigParser(defaults={'protocol': 'xmlrpc', 'port': 8069})
-    cfg.read(str(config))
-    host = cfg.get('Connection', 'hostname')
-    dbname = cfg.get('Connection', 'database')
-    login = cfg.get('Connection', 'login')
-    uid = cfg.get('Connection', 'uid')
 
-    sys.stdout.write(f"Using connection file: {config} (db: {dbname}, host: {host}, login: {login}, uid: {uid})\n")
+    cfg = configparser.ConfigParser(
+        defaults={"protocol": "xmlrpc", "port": 8069}
+    )
+    cfg.read(str(config))
+    host = cfg.get("Connection", "hostname")
+    dbname = cfg.get("Connection", "database")
+    login = cfg.get("Connection", "login")
+    uid = cfg.get("Connection", "uid")
+
+    sys.stdout.write(
+        f"Using connection file: {config} (db: {dbname}, host: {host}, login: {login}, uid: {uid})\n"
+    )
 
     if not dbname:
         offline = True
@@ -960,89 +1157,114 @@ def scaffold_model() -> None:
     if outfile_path.is_file():
         if force:
             if verbose:
-                sys.stdout.write(f"Output file {outfile_path} already exists and will be overwritten.\n")
+                sys.stdout.write(
+                    f"Output file {outfile_path} already exists and will be overwritten.\n"
+                )
         else:
             sys.stderr.write(f"The file {outfile_path} already exists.\n")
             do_file = False
 
     if do_file:
         # Write the file
-        with outfile_path.open('w', encoding='utf-8') as of:
+        with outfile_path.open("w", encoding="utf-8") as of:
             write_begin(of)
             write_mapping(of)
             write_end(of)
 
         if offline:
-            sys.stdout.write(f"Minimal skeleton code generated in {outfile_path}{' because no database is defined' if not dbname else ''}\n")
+            sys.stdout.write(
+                f"Minimal skeleton code generated in {outfile_path}{' because no database is defined' if not dbname else ''}\n"
+            )
         else:
             sys.stdout.write(f"Skeleton code generated in {outfile_path}\n")
     else:
-        sys.stdout.write("Skeleton code not generated. Use option -k|--skeleton or -n|--offline or -f|--force to generate the python script.\n")
+        sys.stdout.write(
+            "Skeleton code not generated. Use option -k|--skeleton or -n|--offline or -f|--force to generate the python script.\n"
+        )
 
     dirname = outfile_path.parent
 
     if append:
-        #Add command to transform script
-        script = dirname / f'transform{script_extension}'
-        if platform.system() == 'Windows':
+        # Add command to transform script
+        script = dirname / f"transform{script_extension}"
+        if platform.system() == "Windows":
             line = f"echo Transform {model_mapped_name}\npython {model_mapped_name}.py > %LOGDIR%\\transform_{model_mapped_name}_out.log 2> %LOGDIR%\\transform_{model_mapped_name}_err.log\n"
         else:
             os.system(f'sed -i "$ d" {script}')
-            line = f'load_script {model_mapped_name}\nchmod +x *.sh\n'
-        with script.open('a', encoding='utf-8') as f:
+            line = f"load_script {model_mapped_name}\nchmod +x *.sh\n"
+        with script.open("a", encoding="utf-8") as f:
             f.write(line)
-        sys.stdout.write(f'Script {model_mapped_name}.py added in {script}\n')
+        sys.stdout.write(f"Script {model_mapped_name}.py added in {script}\n")
 
-        #Add command to load script
-        script = dirname / f'load{script_extension}'
-        if platform.system() == 'Windows':
+        # Add command to load script
+        script = dirname / f"load{script_extension}"
+        if platform.system() == "Windows":
             line = f"echo Load {model_mapped_name}\ncall {model_mapped_name}{script_extension} > %LOGDIR%\\load_{model_mapped_name}_out.log 2> %LOGDIR%\\load_{model_mapped_name}_err.log\n"
         else:
-            line = f'load_script {model_mapped_name}\n'
-        with script.open('a', encoding='utf-8') as f:
+            line = f"load_script {model_mapped_name}\n"
+        with script.open("a", encoding="utf-8") as f:
             f.write(line)
-        sys.stdout.write(f'Script {model}{script_extension} added in {script}\n')
+        sys.stdout.write(
+            f"Script {model}{script_extension} added in {script}\n"
+        )
 
         # Add model to prefix.py
         if not wxmlid:
-            script = dirname / 'prefix.py'
+            script = dirname / "prefix.py"
             line = f"PREFIX_{model_mapped_name.upper()} = f'{{project_name}}_{model_mapped_name}'\n"
-            with script.open('a', encoding='utf-8') as f:
+            with script.open("a", encoding="utf-8") as f:
                 f.write(line)
-            sys.stdout.write(f'Prefix PREFIX_{model_mapped_name.upper()} added in {script}\n')
+            sys.stdout.write(
+                f"Prefix PREFIX_{model_mapped_name.upper()} added in {script}\n"
+            )
         else:
             if verbose:
-                sys.stdout.write('XML_ID prefix not added because of option --with-xmlid\n')
+                sys.stdout.write(
+                    "XML_ID prefix not added because of option --with-xmlid\n"
+                )
 
         # Add model to files.py
-        script = dirname / 'files.py'
-        with script.open('a', encoding='utf-8') as f:
+        script = dirname / "files.py"
+        with script.open("a", encoding="utf-8") as f:
             f.write(f"# Model {model}\n")
-            f.write(f"src_{model_mapped_name} = data_src_dir / '{model_mapped_name}.csv'\n")
-            f.write(f"dest_{model_mapped_name} = data_dest_dir / '{model}.csv'\n")
-        sys.stdout.write(f'{model} files added in {script}\n')
+            f.write(
+                f"src_{model_mapped_name} = data_src_dir / '{model_mapped_name}.csv'\n"
+            )
+            f.write(
+                f"dest_{model_mapped_name} = data_dest_dir / '{model}.csv'\n"
+            )
+        sys.stdout.write(f"{model} files added in {script}\n")
 
         # Add model to clean_data.py
-        script = dirname / 'clean_data.py'
-        with script.open('a', encoding='utf-8') as f:
-            f.write("delete_xml_id(connection, '{}', f'{{project_name}}_{}', demo)\n".format(model, model_mapped_name))
-        sys.stdout.write(f'Model {model} added in {script}\n')
+        script = dirname / "clean_data.py"
+        with script.open("a", encoding="utf-8") as f:
+            f.write(
+                "delete_xml_id(connection, '{}', f'{{project_name}}_{}', demo)\n".format(
+                    model, model_mapped_name
+                )
+            )
+        sys.stdout.write(f"Model {model} added in {script}\n")
     else:
-        sys.stdout.write(f"You should probably add this model in files.py, prefix.py, clean_data.py, transform{script_extension} and load{script_extension} with -a|--append\n")
+        sys.stdout.write(
+            f"You should probably add this model in files.py, prefix.py, clean_data.py, transform{script_extension} and load{script_extension} with -a|--append\n"
+        )
 
 
 def list_models() -> None:
     """List installed models in the target Odoo instance."""
     connection = conf_lib.get_connection_from_config(config)
-    model_model = connection.get_model('ir.model')
+    model_model = connection.get_model("ir.model")
 
-    models = model_model.search_read([('transient', '=', False), ('model', '!=', '_unknown')], ['model', 'name'])
+    models = model_model.search_read(
+        [("transient", "=", False), ("model", "!=", "_unknown")],
+        ["model", "name"],
+    )
 
     if not models:
-        sys.stdout.write('No model found !')
+        sys.stdout.write("No model found !")
         return
 
-    for m in sorted(models, key=lambda f: f['model']):
+    for m in sorted(models, key=lambda f: f["model"]):
         sys.stdout.write(f"{m['model']} ({m['name']})\n")
 
 
@@ -1050,93 +1272,147 @@ def show_version() -> None:
     """Show the version of the script."""
     sys.stdout.write(f"{module_name} {module_version}\n")
 
+
 ##############################################################################
 # MAIN
 ##############################################################################
 
-def create_export_script_file(model: str, model_mapped_name: str, outfile: Path, script_extension: str) -> None:
+
+def create_export_script_file(
+    model: str, model_mapped_name: str, outfile: Path, script_extension: str
+) -> None:
     """Create a shell script to export data based on the generated mapper."""
-    mapper_file_name = f'{model_mapped_name}.py'
+    mapper_file_name = f"{model_mapped_name}.py"
     mapper_file_path = Path(outfile).parent / mapper_file_name
 
     if not mapper_file_path.is_file():
-        sys.stderr.write(f"Error: Mapper file {mapper_file_path} not found. Please generate it first using -m MODEL.\n")
+        sys.stderr.write(
+            f"Error: Mapper file {mapper_file_path} not found. Please generate it first using -m MODEL.\n"
+        )
         sys.exit(1)
 
-    with mapper_file_path.open('r', encoding='utf-8') as f:
+    with mapper_file_path.open("r", encoding="utf-8") as f:
         mapper_content = f.read()
 
     # Simple parsing to extract field names from the mapping dictionary
     # This assumes the mapping is defined as a dictionary named 'mapping_<model_mapped_name>'
     # and each field is a key in that dictionary.
     field_names = []
-    mapping_var_name = f'mapping_{model_mapped_name}'
-    
+    mapping_var_name = f"mapping_{model_mapped_name}"
+
     # Find the mapping dictionary definition
-    mapping_start = mapper_content.find(f'{mapping_var_name} = {{')
+    mapping_start = mapper_content.find(f"{mapping_var_name} = {{")
     if mapping_start == -1:
-        sys.stderr.write(f"Error: Could not find mapping dictionary '{mapping_var_name}' in {mapper_file_path}.\n")
-        sys.exit(1)
-    
-    mapping_end = mapper_content.find('}\n\n', mapping_start)
-    if mapping_end == -1:
-        sys.stderr.write(f"Error: Could not find end of mapping dictionary in {mapper_file_path}.\n")
+        sys.stderr.write(
+            f"Error: Could not find mapping dictionary '{mapping_var_name}' in {mapper_file_path}.\n"
+        )
         sys.exit(1)
 
-    mapping_dict_str = mapper_content[mapping_start + len(f'{mapping_var_name} = {{'):mapping_end]
-    
+    mapping_end = mapper_content.find("}\n\n", mapping_start)
+    if mapping_end == -1:
+        sys.stderr.write(
+            f"Error: Could not find end of mapping dictionary in {mapper_file_path}.\n"
+        )
+        sys.exit(1)
+
+    mapping_dict_str = mapper_content[
+        mapping_start + len(f"{mapping_var_name} = {{") : mapping_end
+    ]
+
     for line in mapping_dict_str.splitlines():
         line = line.strip()
-        if line.startswith('#') or not line:
+        if line.startswith("#") or not line:
             continue
-        
+
         # Extract the key (field name)
         try:
-            field_name = line.split(':')[0].strip().strip('\'"')
+            field_name = line.split(":")[0].strip().strip("'\"")
             if field_name:
                 field_names.append(field_name)
         except IndexError:
             continue
 
     if not field_names:
-        sys.stderr.write(f"Warning: No field names found in mapper file {mapper_file_path}.\n")
-        
-    export_script_name = f'{model_mapped_name}_export{script_extension}'
+        sys.stderr.write(
+            f"Warning: No field names found in mapper file {mapper_file_path}.\n"
+        )
+
+    export_script_name = f"{model_mapped_name}_export{script_extension}"
     export_script_path = Path(outfile).parent / export_script_name
 
-    with export_script_path.open('w', encoding='utf-8') as f:
-        if platform.system() != 'Windows':
+    with export_script_path.open("w", encoding="utf-8") as f:
+        if platform.system() != "Windows":
             f.write("#!/usr/bin/env bash\n\n")
-        f.write(f"odoo-data-flow export \\\n")
-        f.write(f"    --config conf/connection.conf \\\n")
-        f.write(f"    --model \"{model}\" \\\n")
-        f.write(f"    --file \"origin/{model_mapped_name}.csv\" \\\n")
-        f.write(f"    --fields \"{','.join(field_names)}\"\n")
-    
-    if platform.system() != 'Windows':
+        f.write("odoo-data-flow export \\\n")
+        f.write("    --config conf/connection.conf \\\n")
+        f.write(f'    --model "{model}" \\\n')
+        f.write(f'    --file "origin/{model_mapped_name}.csv" \\\n')
+        f.write(f'    --fields "{",".join(field_names)}"\n')
+
+
+    if platform.system() != "Windows":
         export_script_path.chmod(0o755)
 
     sys.stdout.write(f"Export script created at {export_script_path}\n")
 
+
 def main() -> None:
     """Main function."""
-    global module_name, conf_dir_name, orig_dir_name, data_dir_name, log_dir_name, selection_sep, default_base_dir
-    global scaffold, base_dir, dbname, host, model, userid, config, outfile, required, skeleton, wstored, wo2m, wmetadata, mapsel, wxmlid, maxdescr, offline, append, list, force, verbose, version, fieldname
-    global script_extension, project_name, model_mapped_name, model_class_name, model_mapping_name, csv_delimiter, default_python_exe, default_path
+    global \
+        module_name, \
+        conf_dir_name, \
+        orig_dir_name, \
+        data_dir_name, \
+        log_dir_name, \
+        selection_sep, \
+        default_base_dir
+    global \
+        scaffold, \
+        base_dir, \
+        dbname, \
+        host, \
+        model, \
+        userid, \
+        config, \
+        outfile, \
+        required, \
+        skeleton, \
+        wstored, \
+        wo2m, \
+        wmetadata, \
+        mapsel, \
+        wxmlid, \
+        maxdescr, \
+        offline, \
+        append, \
+        list, \
+        force, \
+        verbose, \
+        version, \
+        fieldname
+    global \
+        script_extension, \
+        project_name, \
+        model_mapped_name, \
+        model_class_name, \
+        model_mapping_name, \
+        csv_delimiter, \
+        default_python_exe, \
+        default_path
     global conf_dir, orig_dir, orig_raw_dir, data_dir, log_dir
 
     module_name = Path(sys.argv[0]).name
-    conf_dir_name = 'conf'
-    orig_dir_name = 'origin'
-    data_dir_name = 'data'
-    log_dir_name = 'log'
-    selection_sep = ': '
-    default_base_dir = Path('.')
+    conf_dir_name = "conf"
+    orig_dir_name = "origin"
+    data_dir_name = "data"
+    log_dir_name = "log"
+    selection_sep = ": "
+    default_base_dir = Path(".")
 
-    script_extension = '.cmd' if platform.system() == 'Windows' else '.sh'
+    script_extension = ".cmd" if platform.system() == "Windows" else ".sh"
 
     module_descr = f"""Version: {module_version}
-    Create the structure of an import project and model skeleton codes working 
+    Create the structure of an import project and model skeleton codes working
     with odoo_data_flow (https://github.com/OdooDataFlow/odoo-data-flow).
 
     Functionalities:
@@ -1157,32 +1433,187 @@ def main() -> None:
     More information on https://github.com/OdooDataFlow/odoo_dataflow_scaffold
     """
 
-    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, description=module_descr, epilog=module_epilog)
-    parser.add_argument('-s', '--scaffold', dest='scaffold', action='store_true', help='create the folders structure and the basic project files')
-    parser.add_argument('-p', '--path', dest='path', type=Path, default=default_base_dir, required=False, help='project path (default: current dir)')
-    parser.add_argument('-d', '--db', dest='dbname', default='', required=False, help='target database. If omitted, it is the first part of HOST')
-    parser.add_argument('-t', '--host', dest='host', default='localhost', required=False, help='hostname of the database (default: localhost)')
-    parser.add_argument('-u', '--userid', dest='userid', type=int, default=2, required=False, help='user id of RPC calls (default: 2)')
-    parser.add_argument('-m', '--model', dest='model', required=False, help='technical name of the model to skeleton (ex: res.partner)')
-    parser.add_argument('-c', '--config', dest='config', type=Path, default=Path(conf_dir_name) / 'connection.conf', required=False, help=f'configuration file (relative to --path) defining the RPC connections parameters (default: {Path(conf_dir_name) / "connection.conf"})')
-    parser.add_argument('-o', '--outfile', dest='outfile', type=Path, required=False, help='python script of the model skeleton code (default: model name with dots replaced by underscores)')
-    parser.add_argument('-k', '--skeleton', dest='skeleton', choices=['dict','map'], default='dict', required = False, help='skeleton code type. dict: generate mapping as a simple dictionary. map: create the same dictionary with map functions for each field (default: dict)')
-    parser.add_argument('-r', '--required', dest='required',  action='store_true', help='keep only the required fields without default value (comment the optional fields')
-    parser.add_argument('--field-name', dest='fieldname', choices=['tech','user'], default='user', required = False, help='Field name in import file. tech=technical name, user=User name (default: user). Generates the mapping accordingly.')
-    parser.add_argument('--stored', dest='wstored', action='store_true', help="include only stored fields")
-    parser.add_argument('--with-o2m', dest='wo2m', action='store_true', help="include one2many fields")
-    parser.add_argument('--with-metadata', dest='wmetadata', action='store_true', help="include metadata fields")
-    parser.add_argument('--map-selection', dest='mapsel', action='store_true', help="generate inverse mapping dictionaries (visible value -> technical value) of selection fields in mapping.py")
-    parser.add_argument('--with-xmlid', dest='wxmlid', action='store_true', help="assume the client file contains XML_IDs in identifier fields")
-    parser.add_argument('--max-descr', dest='maxdescr', type=int, default=10, help="limit long descriptions of default value and compute method to MAXDESCR lines (default: 10)")
-    parser.add_argument('-n', '--offline', dest='offline', action='store_true', help="don't fetch fields from model. Create a minimal skeleton")
-    parser.add_argument('-a', '--append', dest='append', action='store_true', help="add model references to files.py, prefix.py and action scripts")
-    parser.add_argument('-f', '--force', dest='force', action='store_true', help='overwrite files and directories if existing.')
-    parser.add_argument('--create-export-script', dest='create_export_script', action='store_true', help="Create a shell script to export data based on the generated mapper.")
-    parser.add_argument('--export-fields', dest='export_fields', action='store_true', help="Output a comma-separated list of field names suitable for export.")
-    parser.add_argument('-l', '--list', dest='list', action='store_true', help="List installed models in the target Odoo instance")
-    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='display process information')
-    parser.add_argument('--version', dest='version', action='store_true', help='show version')
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=module_descr,
+        epilog=module_epilog,
+    )
+    parser.add_argument(
+        "-s",
+        "--scaffold",
+        dest="scaffold",
+        action="store_true",
+        help="create the folders structure and the basic project files",
+    )
+    parser.add_argument(
+        "-p",
+        "--path",
+        dest="path",
+        type=Path,
+        default=default_base_dir,
+        required=False,
+        help="project path (default: current dir)",
+    )
+    parser.add_argument(
+        "-d",
+        "--db",
+        dest="dbname",
+        default="",
+        required=False,
+        help="target database. If omitted, it is the first part of HOST",
+    )
+    parser.add_argument(
+        "-t",
+        "--host",
+        dest="host",
+        default="localhost",
+        required=False,
+        help="hostname of the database (default: localhost)",
+    )
+    parser.add_argument(
+        "-u",
+        "--userid",
+        dest="userid",
+        type=int,
+        default=2,
+        required=False,
+        help="user id of RPC calls (default: 2)",
+    )
+    parser.add_argument(
+        "-m",
+        "--model",
+        dest="model",
+        required=False,
+        help="technical name of the model to skeleton (ex: res.partner)",
+    )
+    parser.add_argument(
+        "-c",
+        "--config",
+        dest="config",
+        type=Path,
+        default=Path(conf_dir_name) / "connection.conf",
+        required=False,
+        help=f"configuration file (relative to --path) defining the RPC connections parameters (default: {Path(conf_dir_name) / 'connection.conf'})",
+    )
+    parser.add_argument(
+        "-o",
+        "--outfile",
+        dest="outfile",
+        type=Path,
+        required=False,
+        help="python script of the model skeleton code (default: model name with dots replaced by underscores)",
+    )
+    parser.add_argument(
+        "-k",
+        "--skeleton",
+        dest="skeleton",
+        choices=["dict", "map"],
+        default="dict",
+        required=False,
+        help="skeleton code type. dict: generate mapping as a simple dictionary. map: create the same dictionary with map functions for each field (default: dict)",
+    )
+    parser.add_argument(
+        "-r",
+        "--required",
+        dest="required",
+        action="store_true",
+        help="keep only the required fields without default value (comment the optional fields",
+    )
+    parser.add_argument(
+        "--field-name",
+        dest="fieldname",
+        choices=["tech", "user"],
+        default="user",
+        required=False,
+        help="Field name in import file. tech=technical name, user=User name (default: user). Generates the mapping accordingly.",
+    )
+    parser.add_argument(
+        "--stored",
+        dest="wstored",
+        action="store_true",
+        help="include only stored fields",
+    )
+    parser.add_argument(
+        "--with-o2m",
+        dest="wo2m",
+        action="store_true",
+        help="include one2many fields",
+    )
+    parser.add_argument(
+        "--with-metadata",
+        dest="wmetadata",
+        action="store_true",
+        help="include metadata fields",
+    )
+    parser.add_argument(
+        "--map-selection",
+        dest="mapsel",
+        action="store_true",
+        help="generate inverse mapping dictionaries (visible value -> technical value) of selection fields in mapping.py",
+    )
+    parser.add_argument(
+        "--with-xmlid",
+        dest="wxmlid",
+        action="store_true",
+        help="assume the client file contains XML_IDs in identifier fields",
+    )
+    parser.add_argument(
+        "--max-descr",
+        dest="maxdescr",
+        type=int,
+        default=10,
+        help="limit long descriptions of default value and compute method to MAXDESCR lines (default: 10)",
+    )
+    parser.add_argument(
+        "-n",
+        "--offline",
+        dest="offline",
+        action="store_true",
+        help="don't fetch fields from model. Create a minimal skeleton",
+    )
+    parser.add_argument(
+        "-a",
+        "--append",
+        dest="append",
+        action="store_true",
+        help="add model references to files.py, prefix.py and action scripts",
+    )
+    parser.add_argument(
+        "-f",
+        "--force",
+        dest="force",
+        action="store_true",
+        help="overwrite files and directories if existing.",
+    )
+    parser.add_argument(
+        "--create-export-script",
+        dest="create_export_script",
+        action="store_true",
+        help="Create a shell script to export data based on the generated mapper.",
+    )
+    parser.add_argument(
+        "--export-fields",
+        dest="export_fields",
+        action="store_true",
+        help="Output a comma-separated list of field names suitable for export.",
+    )
+    parser.add_argument(
+        "-l",
+        "--list",
+        dest="list",
+        action="store_true",
+        help="List installed models in the target Odoo instance",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action="store_true",
+        help="display process information",
+    )
+    parser.add_argument(
+        "--version", dest="version", action="store_true", help="show version"
+    )
 
     args = parser.parse_args()
 
@@ -1222,23 +1653,31 @@ def main() -> None:
         sys.exit(0)
 
     if model:
-        model_mapped_name = model.replace('.', '_')
+        model_mapped_name = model.replace(".", "_")
         if not outfile:
-            outfile = Path(f'{model_mapped_name}.py')
+            outfile = Path(f"{model_mapped_name}.py")
 
     if create_export_script:
         if not model:
-            sys.stderr.write("Error: --create-export-script requires -m MODEL to be specified.\n")
+            sys.stderr.write(
+                "Error: --create-export-script requires -m MODEL to be specified.\n"
+            )
             sys.exit(1)
-        create_export_script_file(model, model_mapped_name, outfile, script_extension)
+        create_export_script_file(
+            model, model_mapped_name, outfile, script_extension
+        )
         sys.exit(0)
 
     if export_fields:
         if not model:
-            sys.stderr.write("Error: --export-fields requires -m MODEL to be specified.\n")
+            sys.stderr.write(
+                "Error: --export-fields requires -m MODEL to be specified.\n"
+            )
             sys.exit(1)
         if not dbname:
-            sys.stderr.write("Error: --export-fields requires a database connection. Please provide -d DBNAME or ensure connection.conf is properly configured.\n")
+            sys.stderr.write(
+                "Error: --export-fields requires a database connection. Please provide -d DBNAME or ensure connection.conf is properly configured.\n"
+            )
             sys.exit(1)
 
         sys.stdout.write("Generating import-compatible fields...\n")
@@ -1246,7 +1685,7 @@ def main() -> None:
         exportable_field_names = []
         for f in fields:
             # Exclude fields not suitable for direct import
-            if f.name in ('create_uid', 'write_uid'):
+            if f.name in ("create_uid", "write_uid"):
                 continue
             if f.compute:
                 continue
@@ -1254,26 +1693,30 @@ def main() -> None:
                 continue
             if not f.store:
                 continue
-            if f.type == 'one2many':
+            if f.type == "one2many":
                 continue
-            
+
             exportable_field_names.append(f.name)
-        
+
         sys.stdout.write(",".join(exportable_field_names) + "\n")
         sys.stdout.write("Import-compatible fields generated.\n")
 
     # If no action set, prompt for scaffolding
     action_args = [scaffold, model]
     if not any(action_args):
-        response = input(f"Do you want the create the folder structure in {base_dir} ? (y|N): ")
-        scaffold = ('Y' == response.upper())
+        response = input(
+            f"Do you want the create the folder structure in {base_dir} ? (y|N): "
+        )
+        scaffold = "Y" == response.upper()
 
     if not scaffold and not model:
-        sys.stderr.write('You need to set an action with -s|--scaffold or -m|--model or -l|--list\n')
-        sys.stderr.write(f'Type {module_name} -h|--help for help\n')
+        sys.stderr.write(
+            "You need to set an action with -s|--scaffold or -m|--model or -l|--list\n"
+        )
+        sys.stderr.write(f"Type {module_name} -h|--help for help\n")
         sys.exit(1)
 
-    script_extension = '.cmd' if platform.system() == 'Windows' else '.sh'
+    script_extension = ".cmd" if platform.system() == "Windows" else ".sh"
 
     # Do cascaded actions
     if scaffold:
@@ -1284,29 +1727,30 @@ def main() -> None:
 
         conf_dir = base_dir / conf_dir_name
         orig_dir = base_dir / orig_dir_name
-        orig_raw_dir = orig_dir / 'binary'
+        orig_raw_dir = orig_dir / "binary"
         data_dir = base_dir / data_dir_name
         log_dir = base_dir / log_dir_name
 
         # If database is omitted, get the first part of the hostname
         if is_remote_host(host) and not dbname:
-            dbname = host.split('.')[0]
-            sys.stdout.write(f'Database is set by default to {dbname}.\n')
+            dbname = host.split(".")[0]
+            sys.stdout.write(f"Database is set by default to {dbname}.\n")
 
         scaffold_dir()
 
     if model:
-        model_mapped_name = model.replace('.', '_')
-        model_class_name = model.title().replace('.', '')
-        model_mapping_name = f'mapping_{model_mapped_name}'
+        model_mapped_name = model.replace(".", "_")
+        model_class_name = model.title().replace(".", "")
+        model_mapping_name = f"mapping_{model_mapped_name}"
         if not outfile:
-            outfile = Path(f'{model_mapped_name}.py')
+            outfile = Path(f"{model_mapped_name}.py")
         config = base_dir / config
-        csv_delimiter = ';'
-        default_python_exe = ''
-        default_path = ''
+        csv_delimiter = ";"
+        default_python_exe = ""
+        default_path = ""
 
         scaffold_model()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
