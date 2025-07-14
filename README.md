@@ -55,7 +55,7 @@ git clone git@github.com:OdooDataFlow/odoo_dataflow_scaffold.git
 # 2. How To Use It
 
 ## 2.1. Create the project structure
-      
+
 To create the project structure, run the following command:
 
 ```bash
@@ -75,7 +75,7 @@ The main options are:
 For more information on project scaffolding, see [Folders Structure and Project Files](#3-folders-structure-and-project-files).
 
 ## 2.2. Generate a model skeleton code
-   
+
 From your project folder, verify the connection parameters in `conf/connection.conf` and generate the skeleton code for a model:
 
 ```
@@ -108,8 +108,8 @@ The complete set of options is described [here](#4-model-skeleton-codes).
     # Model my.model
     src_my_model = os.path.join(data_src_dir, 'my_model.csv')
     ```
-    
-   * Review the python script _my_model.py_. In the generated code, you should at least:   
+
+   * Review the python script _my_model.py_. In the generated code, you should at least:
      * verify the column names. By default their name is the same as the field, which is probably not correct for all columns of the client file. When the tag 'CSV_COLUMN' appears, you also have to replace it by the right column name,
      * apply the right date formats, if any. You always need to replace the tag 'CSV_DATE_FORMAT' with the [directives](https://docs.python.org/3/library/datetime.html#strftime-strptime-behavior) reflecting the field format in your client file,
      * comment or remove the fields you don't need.
@@ -123,7 +123,7 @@ The complete set of options is described [here](#4-model-skeleton-codes).
         # Date of Transfer (#2832): stored, optional, readonly, datetime
         'date_done': mapper.val('date_done', postprocess=lambda x: datetime.strptime(x, 'CSV_DATE_FORMAT').strftime('%Y-%m-%d 00:00:00')),
         ```
-    
+
       * By default the delimiter of your CSV file is set to a semicolon ';'. If you use another delimiter you need to change it at the line:
 
         ```python
@@ -133,7 +133,7 @@ The complete set of options is described [here](#4-model-skeleton-codes).
      * `mapping.py` if you used the option **--map-selection**,
      * `prefix.py` if you import boolean fields or if you didn't use the option **--with-xmlid**,
      * the transform script `transform.sh` (`transform.cmd` on Windows) and the load script `load.sh` (`load.cmd` on Windows) to be sure that all shell commands you need will be launched.
-        
+
         See the options **[--map-selection](#map-selection)** and  **[-a | --append](#append)** for more details.
 
 ## 2.4. Repeat steps 2.2 and 2.3 for all models and client files you need to process.
@@ -265,18 +265,18 @@ mapping_my_model =  {
     ...
 }
 ```
-In both skeleton types, the default columns name can be chosen between the technical or the user field name in Odoo with option **--field-name tech** or **--field-name user**.
+In both skeleton types, the default columns name can be chosen between the technical or the user field name in Odoo with option `--field-name tech` or `--field-name user`.
 
 The first displayed field is always the "id" field, then the required ones, then the optional ones, both sorted by name. Their map functions, if any, follow the same order.
 
-You can use the option **-n | --offline** to get a skeleton code without field. 
+You can use the option **-n | --offline** to get a skeleton code without field.
 
 ```python
 mapping_my_model =  {
     'id': ,
 }
 ```
-This way you keep the benefits of the basic skeleton and the automatic integration of your new script in the project. But you're not annoyed with a lot of fields you probably don't need.  
+This way you keep the benefits of the basic skeleton and the automatic integration of your new script in the project. But you're not annoyed with a lot of fields you probably don't need.
 
 >**Note:** You may also consider the option [**-r | --required**](#required).
 
@@ -285,8 +285,8 @@ The offline mode is automatically set when no database is provided. When working
 ## 4.2. Fields Selection
 
  You can exclude the non stored fields with the option **--stored**. It is usually advisable but it avoids to import through non stored inherited fields.
- 
- One2many and metadata fields are excluded by default but they can be included respectively with the options **--with-o2m** and **--with-metadata**. 
+
+ One2many and metadata fields are excluded by default but they can be included respectively with the options **--with-o2m** and **--with-metadata**.
 
 
 ## 4.3. Fields Information
@@ -316,18 +316,18 @@ Example:
 'state_id/id': mapper.m2o(PREFIX_RES_COUNTRY_STATE, 'state_id'),
 
 # Sales Order (#5305): stored, required, selection
-# SELECTION: 'no-message': No Message, 'warning': Warning, 'block': Blocking Message, 
+# SELECTION: 'no-message': No Message, 'warning': Warning, 'block': Blocking Message,
 # DEFAULT: no-message
 'sale_warn': mapper.val('sale_warn'),
 
 # Rml header (#1069): stored, required, text
-# DEFAULT: 
-# 
+# DEFAULT:
+#
 # <header>
 #  <pageTemplate>
 # [truncated...]
 'rml_header': mapper.val('rml_header'),
-```    
+```
 
 ## 4.4. Other Skeleton Options
 
@@ -369,21 +369,21 @@ Now with **--with-xmlid**.
 'field_id/id': mapper.val('field_id'),
 ```
 
-<a id=required></a>With the option **-r | --required**, all the skeleton code related to optional fields is commented. It's handy when you have a few fields to import into a model that has a lot. You still have all the fields described, but you don't need to (un)comment or remove lots of them. 
+<a id=required></a>With the option **-r | --required**, all the skeleton code related to optional fields is commented. It's handy when you have a few fields to import into a model that has a lot. You still have all the fields described, but you don't need to (un)comment or remove lots of them.
 >**Note:** Some fields are always commented because they should not be imported. It's namely the case with related stored, computed and non stored (and non related) fields.
 
 At the end of the skeleton code stands the command line that launches a transformation to one import file (here: _dest_my_model_).
 ```python
 processor.process(mapping_my_model, dest_my_model, {'model': 'my.model', 'context': "{'some_key': True|False}", 'groupby': '', 'worker': 1, 'batch_size': 10}, 'set', verbose=False)
 ```
-This line is preset with some options: _groupby_, _worker_ and _batch_size_ you may want to change. By default, no context is provided, letting the import script from odoo_csv_tools (_odoo_import_thread.py_) manage a default one. Meanwhile, under certain conditions, a context is prefilled here with: 
+This line is preset with some options: _groupby_, _worker_ and _batch_size_ you may want to change. By default, no context is provided, letting the import script from odoo_data_flow (_odoo_import_threaded.py_) manage a default one. Meanwhile, under certain conditions, a context is prefilled here with:
 * **'tracking_disable': True** if a tracked field was found in the model.
 * **'defer_fields_computation': True** if a computed field was found in the model.
 * **'write_metadata': True** if the option _--with-metadata_ was used _(and even if there is no audit fields)_.
 
 By default, the generated python script is located in the current path and named as the model with dots '.' replaced by underscores '_' (my.model -> my_model.py). You can set another file name (and location) with the option **-o | --outfile**.
 
-<a id=append></a>When a model is added to the project, the needed references can be automatically added in `files.py`, `prefixes.py`, `clean_data.py`, the transform and the load scripts with the option **-a | --append**. 
+<a id=append></a>When a model is added to the project, the needed references can be automatically added in `files.py`, `prefixes.py`, `clean_data.py`, the transform and the load scripts with the option **-a | --append**.
 
 * In `files.py`: the names of the client file and the import file.
     ```python
@@ -429,7 +429,7 @@ The skeleton code is preserved if its python script already exists. You can recr
 # 5. Command Line Tricks
 
 It is possible to scaffold the project structure and to generate the first skeleton code in one command line. You can only do that with a database where the default credentials _admin/admin_ are valid for the userid. Also, if the database is not on your local computer, encrypted connections must be allowed on port 443.
- 
+
 ```bash
 odoo_dataflow_scaffold.py -s -p project_dir -d my_db -t my_db.odoo.com -m my.model -a
 ```
@@ -439,9 +439,9 @@ odoo_dataflow_scaffold.py -s -p project_dir -d my_db -t my_db.odoo.com -m my.mod
 ```bash
  odoo_dataflow_scaffold.py -s -p project_dir -t my_db.odoo.com -m my.model -a
  ```
- 
+
  When no option is used, you are prompted to scaffold a project in your current directory. This path can be changed with the only option **-p | --path** So a project can be quickly scaffolded into your working directory with the command:
- 
+
  ```bash
  odoo_dataflow_scaffold.py
  ```
@@ -453,12 +453,12 @@ or in another directory with the command:
 # 6. How-To
 * To quickly create a new project:
 ```bash
-odoo_dataflow_scaffold.py -s -p my_project   
+odoo_dataflow_scaffold.py -s -p my_project
 ```
 Assuming the file `conf/connection.conf` is valid and you are in the project folder.
 * To generate a new model:
 ```bash
-odoo_dataflow_scaffold.py -m my.model -a   
+odoo_dataflow_scaffold.py -m my.model -a
 ```
 * To generate a new model without adding its references to the python and action scripts (_say, you just need the mapping code to integrate in an existing script_):
 ```bash
