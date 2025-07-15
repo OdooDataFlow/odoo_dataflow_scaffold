@@ -1333,7 +1333,11 @@ def show_version() -> None:
 
 
 def create_export_script_file(
-    model: str, model_mapped_name: str, outfile: Path, script_extension: str
+    model: str,
+    model_mapped_name: str,
+    outfile: Path,
+    script_extension: str,
+    source_config: str,
 ) -> None:
     """Create a shell script to export data based on the generated mapper."""
     mapper_file_name = f"{model_mapped_name}.py"
@@ -1398,7 +1402,7 @@ def create_export_script_file(
         if platform.system() != "Windows":
             f.write("#!/usr/bin/env bash\n\n")
         f.write("odoo-data-flow export \\\n")
-        f.write("    --config conf/connection.conf \\\n")
+        f.write(f'    --config "{source_config}" \\\n')
         f.write(f'    --model "{model}" \\\n')
         f.write(f'    --file "origin/{model_mapped_name}.csv" \\\n')
         f.write(f'    --fields "{",".join(field_names)}" \\\n')
@@ -1750,7 +1754,11 @@ def main() -> None:
             )
             sys.exit(1)
         create_export_script_file(
-            model, model_mapped_name, outfile, script_extension
+            model,
+            model_mapped_name,
+            outfile,
+            script_extension,
+            source_config_name,
         )
         sys.exit(0)
 
