@@ -1782,6 +1782,15 @@ def main() -> None:
             # Exclude fields not suitable for direct import
             if f.name in ("create_uid", "write_uid"):
                 continue
+            if f.name in (
+                "image_small",
+                "image_medium",
+                "image_128",
+                "image_256",
+                "image_512",
+                "image_1024",
+            ):
+                continue
             if f.compute:
                 continue
             if f.related:
