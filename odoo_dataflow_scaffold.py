@@ -1544,6 +1544,7 @@ def main() -> None:
         "--config",
         dest="config",
         type=Path,
+        default=Path(conf_dir_name) / "connection.conf",
         help="Default config file if source/destination are not set.",
     )
     parser.add_argument(
