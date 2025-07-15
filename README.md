@@ -45,7 +45,7 @@ To install `odoo_dataflow_scaffold` from GitHub, use the following command:
 git clone git@github.com:OdooDataFlow/odoo_dataflow_scaffold.git
 ```
 
-<!-- * From PyPi  -->
+<!-- * From PyPi -->
 
 ```bash
 [sudo] pip install odoo_dataflow_scaffold
@@ -72,11 +72,24 @@ The main options are:
 * `-t | --host`: Sets the hostname of the database. The default is "localhost".
 * `-u | --userid`: Sets the user ID used by RPC calls. The default is "2".
 
-For more information on project scaffolding, see [Folders Structure and Project Files](#3-folders-structure-and-project-files).
+### 2.1.1. For Data Migrations (Source & Destination DBs)
+
+For data migration scenarios where you need to read from one database and write to another, you can specify separate configuration files.
+
+* `--source-config`: Path to the connection file for the source database (for reading metadata).
+* `--destination-config`: Path to the connection file for the destination database (for generating import scripts).
+
+**Example Usage:**
+```bash
+odoo_dataflow_scaffold.py -s -p my_migration \
+    --source-config conf/odoo12.conf \
+    --destination-config conf/odoo18.conf
+```
+This will create two separate config files in the `conf/` directory. The generated transformation scripts will be pre-configured to use the source config for reading and the destination config for writing the final `load.sh` script.
 
 ## 2.2. Generate a model skeleton code
 
-From your project folder, verify the connection parameters in `conf/connection.conf` and generate the skeleton code for a model:
+From your project folder, verify the connection parameters in `conf/connection.conf` (or your source/destination files) and generate the skeleton code for a model:
 
 ```
 odoo_dataflow_scaffold.py -m my.model -a [--map-selection] [--with-xmlid]
@@ -109,10 +122,10 @@ The complete set of options is described [here](#4-model-skeleton-codes).
     src_my_model = os.path.join(data_src_dir, 'my_model.csv')
     ```
 
-   * Review the python script _my_model.py_. In the generated code, you should at least:
-     * verify the column names. By default their name is the same as the field, which is probably not correct for all columns of the client file. When the tag 'CSV_COLUMN' appears, you also have to replace it by the right column name,
-     * apply the right date formats, if any. You always need to replace the tag 'CSV_DATE_FORMAT' with the [directives](https://docs.python.org/3/library/datetime.html#strftime-strptime-behavior) reflecting the field format in your client file,
-     * comment or remove the fields you don't need.
+    * Review the python script _my_model.py_. In the generated code, you should at least:
+      * verify the column names. By default their name is the same as the field, which is probably not correct for all columns of the client file. When the tag 'CSV_COLUMN' appears, you also have to replace it by the right column name,
+      * apply the right date formats, if any. You always need to replace the tag 'CSV_DATE_FORMAT' with the [directives](https://docs.python.org/3/library/datetime.html#strftime-strptime-behavior) reflecting the field format in your client file,
+      * comment or remove the fields you don't need.
         ```python
         mapping_my_model = {
         # ID (#2841): stored, optional, readonly, integer
@@ -122,6 +135,7 @@ The complete set of options is described [here](#4-model-skeleton-codes).
         'company_id/id': mapper.m2o(PREFIX_RES_COMPANY, 'company_id'),
         # Date of Transfer (#2832): stored, optional, readonly, datetime
         'date_done': mapper.val('date_done', postprocess=lambda x: datetime.strptime(x, 'CSV_DATE_FORMAT').strftime('%Y-%m-%d 00:00:00')),
+        }
         ```
 
       * By default the delimiter of your CSV file is set to a semicolon ';'. If you use another delimiter you need to change it at the line:
@@ -129,10 +143,10 @@ The complete set of options is described [here](#4-model-skeleton-codes).
         ```python
         processor = Processor(src_my_model, delimiter=';', preprocess=preprocess_MyModel)
         ```
-   * All other project files are automatically set up. Although it's always advised to review:
-     * `mapping.py` if you used the option **--map-selection**,
-     * `prefix.py` if you import boolean fields or if you didn't use the option **--with-xmlid**,
-     * the transform script `transform.sh` (`transform.cmd` on Windows) and the load script `load.sh` (`load.cmd` on Windows) to be sure that all shell commands you need will be launched.
+    * All other project files are automatically set up. Although it's always advised to review:
+      * `mapping.py` if you used the option **--map-selection**,
+      * `prefix.py` if you import boolean fields or if you didn't use the option **--with-xmlid**,
+      * the transform script `transform.sh` (`transform.cmd` on Windows) and the load script `load.sh` (`load.cmd` on Windows) to be sure that all shell commands you need will be launched.
 
         See the options **[--map-selection](#map-selection)** and  **[-a | --append](#append)** for more details.
 
@@ -198,9 +212,9 @@ The following directories and files are created:
 
 * `conf/`: This directory contains connection configuration files:
     * `connection.conf`: The default configuration file for RPC calls.
-    * `connection.local`: A preset for importing data into a local database.
-    * `connection.staging`: A preset for importing data into a staging database (uses encrypted connections).
-    * `connection.master`: A preset for importing data into the master database (uses encrypted connections).
+    * `local_connection.conf`: A preset for importing data into a local database.
+    * `staging_connection.conf`: A preset for importing data into a staging database (uses encrypted connections).
+    * `master_connection.conf`: A preset for importing data into the master database (uses encrypted connections).
 * `origin/`: This directory stores the original client files in CSV format.
 * `origin/binary/`: This directory stores any binary files associated with the client data (e.g., images, documents).
 * `data/`: This directory stores the transformed files ready for import, generated after running the transformation script.
@@ -224,9 +238,9 @@ The following directories and files are created:
 
 The following options further configure the connection files during the scaffolding process:
 
-* When the `-d | --db` and `-t | --host` options are provided, the database name and hostname are stored in both the `connection.local` and `connection.conf` files. The default hostname is `localhost`, and the default database user credentials are `admin/admin`.
+* When the `-d | --db` and `-t | --host` options are provided, the database name and hostname are stored in both the `local_connection.conf` and `connection.conf` files. The default hostname is `localhost`, and the default database user credentials are `admin/admin`.
 * The default user ID for RPC calls is `2`. You can change this using the `-u | --userid` option.
-* The `connection.local` and ` configured to establish encrypted connections when you specify a remote host. Connections remain unencrypted only when the database is located on `localhost`.
+* The `local_connection.conf` and ` configured to establish encrypted connections when you specify a remote host. Connections remain unencrypted only when the database is located on `localhost`.
 * Scaffolding in an existing path preserves any existing files and directories. To overwrite them, use the `-f | --force` option.
 
 
@@ -342,8 +356,7 @@ res_partner_sale_warn_map = {
     "Warning": 'warning',
     "Blocking Message": 'block',
 }
-```
-`res_partner.py`
+```res_partner.py`
 ```python
 mapping_res_partner = {
     ...
@@ -436,7 +449,7 @@ odoo_dataflow_scaffold.py -s -p project_dir -d my_db -t my_db.odoo.com -m my.mod
 
  It is possible to reduce the command line. If the option **-t | --host** is used without **-d | --db**, the database will be the first part of the hostname. So, this command line is equivalent to the previous one.
 
-```bash
+ ```bash
  odoo_dataflow_scaffold.py -s -p project_dir -t my_db.odoo.com -m my.model -a
  ```
 
