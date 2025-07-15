@@ -13,7 +13,7 @@ from typing import Any, Callable, Dict, List
 
 from odoo_data_flow.lib import conf_lib
 
-module_version = "1.4.2"
+module_version = "1.4.3"
 offline = False
 dbname = ""
 hostname = ""
@@ -47,6 +47,13 @@ maxdescr = 10
 append = False
 verbose = False
 fieldname = ""
+conf_dir = ""
+orig_dir = ""
+orig_raw_dir = ""
+data_dir = ""
+log_dir = ""
+model_class_name = ""
+model_mapping_name = ""
 
 
 ##############################################################################
@@ -116,12 +123,13 @@ def is_remote_host(hostname: str) -> bool:
 
 
 @check_file_exists
-def create_connection_file_local(file: Path) -> None:
-    """Enforce encrypted connection on remote hosts.
-    Leave unencrypted for local databases.
+def create_connection_file(
+    file: Path, host: str, dbname: str, userid: int
+) -> None:
+    """Create a connection file.
 
-    Args:
-        file: The path to the connection file.
+    Enforce encrypted connection on remote hosts.
+    Leave unencrypted for local databases.
     """
     is_remote = is_remote_host(host)
     protocol = "jsonrpcs" if is_remote else "jsonrpc"
@@ -134,25 +142,6 @@ def create_connection_file_local(file: Path) -> None:
         f.write("password = admin\n")
         f.write(f"protocol = {protocol}\n")
         f.write(f"port = {port}\n")
-        f.write(f"uid = {userid}\n")
-
-
-@check_file_exists
-def create_connection_file_remote(file: Path, hostname: str) -> None:
-    """Just a preset for encrypted connection.
-
-    Args:
-        file: The path to the connection file.
-        hostname: The hostname of the remote server.
-    """
-    with file.open("w", encoding="utf-8") as f:
-        f.write("[Connection]\n")
-        f.write(f"hostname = {hostname}\n")
-        f.write("database = \n")
-        f.write("login = \n")
-        f.write("password = \n")
-        f.write("protocol = jsonrpcs\n")
-        f.write("port = 443\n")
         f.write(f"uid = {userid}\n")
 
 
@@ -225,6 +214,7 @@ def create_transform_script(file: Path) -> None:
             f.write("}\n\n")
             f.write("./cleanup_data_dir.sh\n\n")
             f.write("# Add here all transform commands\n")
+            f.write("# python my_model.py\n")
             f.write("# load_script python_script (without extension)\n")
             f.write("chmod +x *.sh\n")
         file.chmod(0o755)
@@ -337,6 +327,9 @@ def create_file_prefix(file: Path) -> None:
 def create_file_mapping(file: Path) -> None:
     """Create the skeleton of mapping.py.
 
+        Use odoo_import_scaffold with option --map-selection to
+        automatically build dictionaries of selection fields.
+
     Args:
         file: The path to the mapping.py file.
     """
@@ -349,26 +342,20 @@ def create_file_mapping(file: Path) -> None:
 
 
 @check_file_exists
-def create_file_files(file: Path) -> None:
-    """Create the skeleton of files.py.
-
-    Args:
-        file: The path to the files.py file.
-    """
+def create_file_files(file: Path, source_config: str, dest_config: str) -> None:
+    """Create the skeleton of files.py."""
     with file.open("w", encoding="utf-8") as f:
         f.write("# -*- coding: utf-8 -*-\n\n")
         f.write("# This file defines the names of all used files.\n\n")
-        f.write("from pathlib import Path\n")
-        f.write("\n")
+        f.write("from pathlib import Path\n\n")
         f.write("# Folders\n")
         f.write(f"conf_dir = Path('{conf_dir_name}')\n")
         f.write(f"data_src_dir = Path('{orig_dir_name}')\n")
         f.write("data_raw_dir = data_src_dir / 'binary'\n")
-        f.write(f"data_dest_dir = Path('{data_dir_name}')\n")
-        f.write("\n")
+        f.write(f"data_dest_dir = Path('{data_dir_name}')\n\n")
         f.write("# Configuration\n")
-        f.write("config_file = conf_dir / 'connection.conf'\n")
-        f.write("\n")
+        f.write(f"source_config_file = conf_dir / '{source_config}'\n")
+        f.write(f"destination_config_file = conf_dir / '{dest_config}'\n\n")
         f.write("# Declare here all data files\n")
 
         if not model:
@@ -718,22 +705,57 @@ def create_file_init_map(file: Path) -> None:
         )
 
 
-def scaffold_dir() -> None:
+def scaffold_dir(
+    args: argparse.Namespace, source_config: str, dest_config: str
+) -> None:
     """Create the whole directory structure and the basic project files."""
+    # If database is omitted, get the first part of the hostname
+    if is_remote_host(args.host) and not args.dbname:
+        dbname = args.host.split(".")[0]
+        sys.stdout.write(f"Database is set by default to {dbname}.\n")
+    else:
+        dbname = args.dbname
+
+    conf_dir = base_dir / conf_dir_name
+    orig_dir = base_dir / orig_dir_name
+    conf_dir = base_dir / conf_dir_name
+    orig_dir = base_dir / orig_dir_name
+    orig_raw_dir = orig_dir / "binary"
+    data_dir = base_dir / data_dir_name
+    log_dir = base_dir / log_dir_name
+
     create_folder(Path(conf_dir))
     create_folder(Path(orig_dir))
     create_folder(Path(orig_raw_dir))
     create_folder(Path(data_dir))
     create_folder(Path(log_dir))
 
-    create_connection_file_local(Path(conf_dir) / "connection.conf")
-    create_connection_file_local(Path(conf_dir) / "connection.local")
-    create_connection_file_remote(
-        Path(conf_dir) / "connection.staging", ".dev.odoo.com"
+    # Create the source connection file
+    create_connection_file(
+        conf_dir / source_config, args.host, dbname, args.userid
     )
-    create_connection_file_remote(
-        Path(conf_dir) / "connection.master", ".odoo.com"
+
+    create_connection_file(
+        conf_dir / "local_connection.conf", "localhost", dbname, args.userid
     )
+    create_connection_file(
+        conf_dir / "staging_connection.conf",
+        ".dev.odoo.com",
+        dbname,
+        args.userid,
+    )
+    create_connection_file(
+        conf_dir / "prod_connection.conf", ".odoo.com", dbname, args.userid
+    )
+
+    # If a separate destination is specified, create a placeholder for it
+    if source_config != dest_config:
+        create_connection_file(
+            conf_dir / dest_config,
+            "DESTINATION_HOST",
+            "DESTINATION_DB",
+            args.userid,
+        )
 
     create_cleanup_script(
         Path(base_dir) / f"cleanup_data_dir{script_extension}"
@@ -742,7 +764,7 @@ def scaffold_dir() -> None:
     create_load_script(Path(base_dir) / f"load{script_extension}")
     create_file_prefix(Path(base_dir) / "prefix.py")
     create_file_mapping(Path(base_dir) / "mapping.py")
-    create_file_files(Path(base_dir) / "files.py")
+    create_file_files(Path(base_dir) / "files.py", source_config, dest_config)
     create_file_lib(Path(base_dir) / "funclib.py")
     create_file_clean_data(Path(base_dir) / "clean_data.py")
     create_file_install_lang(Path(base_dir) / "install_lang.py")
@@ -1467,8 +1489,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=module_descr,
-        epilog=module_epilog,
+        description=f"Version: {module_version}\nTool for scaffolding odoo-data-flow projects.",
     )
     parser.add_argument(
         "-s",
@@ -1523,9 +1544,19 @@ def main() -> None:
         "--config",
         dest="config",
         type=Path,
-        default=Path(conf_dir_name) / "connection.conf",
-        required=False,
-        help=f"configuration file (relative to --path) defining the RPC connections parameters (default: {Path(conf_dir_name) / 'connection.conf'})",
+        help="Default config file if source/destination are not set.",
+    )
+    parser.add_argument(
+        "--source-config",
+        dest="source_config",
+        type=Path,
+        help="Source Odoo instance for reading metadata.",
+    )
+    parser.add_argument(
+        "--destination-config",
+        dest="destination_config",
+        type=Path,
+        help="Destination Odoo instance for writing import scripts.",
     )
     parser.add_argument(
         "-o",
@@ -1677,14 +1708,26 @@ def main() -> None:
     export_fields = args.export_fields
 
     # --- Start of Corrected Logic ---
-    # 1. Parse config file early to get database name if not provided by CLI
+
+    # Determine which config files to use
+    source_config_name = args.source_config or args.config or "connection.conf"
+    dest_config_name = (
+        args.destination_config or args.config or "dest_connection.conf"
+    )
+
+    # Read config file early to get database name if not provided by CLI
+    # Read dbname from source config for operations that need it
+    config_path = args.path / source_config_name
+    dbname = args.dbname
     if not dbname:
-        config_path = base_dir / config
+        config_path = base_dir / source_config_name
+        print(f"Reading database name from config file {config_path} ...")
         if config_path.is_file():
             cfg = configparser.ConfigParser()
             cfg.read(str(config_path))
             if cfg.has_section("Connection"):
                 dbname = cfg.get("Connection", "database")
+                print(f"Found database name *{dbname}* from config file.")
 
     # 2. Now perform actions that require the database name
     if version:
@@ -1711,6 +1754,7 @@ def main() -> None:
         sys.exit(0)
 
     if export_fields:
+        print("export fields called")
         if not model:
             sys.stderr.write(
                 "Error: --export-fields requires -m MODEL to be specified.\n"
@@ -1752,6 +1796,7 @@ def main() -> None:
         )
         scaffold = "Y" == response.upper()
 
+    # If still no action, exit with help message
     if not scaffold and not model:
         sys.stderr.write(
             "You need to set an action with -s|--scaffold or -m|--model or -l|--list\n"
@@ -1759,27 +1804,17 @@ def main() -> None:
         sys.stderr.write(f"Type {module_name} -h|--help for help\n")
         sys.exit(1)
 
+    # Do cascaded actions
     script_extension = ".cmd" if platform.system() == "Windows" else ".sh"
 
-    # Do cascaded actions
-    if scaffold:
-        if base_dir == default_base_dir:
-            project_name = Path.cwd().name
-        else:
-            project_name = base_dir.name
+    if args.scaffold:
+        scaffold_dir(args, source_config_name, dest_config_name)
 
-        conf_dir = base_dir / conf_dir_name
-        orig_dir = base_dir / orig_dir_name
-        orig_raw_dir = orig_dir / "binary"
-        data_dir = base_dir / data_dir_name
-        log_dir = base_dir / log_dir_name
-
-        # If database is omitted, get the first part of the hostname
         if is_remote_host(host) and not dbname:
             dbname = host.split(".")[0]
             sys.stdout.write(f"Database is set by default to {dbname}.\n")
 
-        scaffold_dir()
+        scaffold_dir(args, str(source_config_name), str(dest_config_name))
 
     if model:
         model_mapped_name = model.replace(".", "_")
