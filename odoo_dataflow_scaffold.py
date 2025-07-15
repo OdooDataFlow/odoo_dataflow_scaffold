@@ -1005,7 +1005,7 @@ def write_begin(file: io.TextIOWrapper) -> None:
     file.write("# import odoolib\n")
     file.write("# from odoo_data_flow.lib import conf_lib\n")
     file.write(
-        "# connection = conf_lib.get_connection_from_config(config_file)\n"
+        "# connection = conf_lib.get_connection_from_config(source_config_file)\n"
     )
     file.write(f"def preprocess_{model_class_name}(header, data):\n")
     file.write("    # Do nothing\n")
@@ -1025,7 +1025,7 @@ def write_begin(file: io.TextIOWrapper) -> None:
     file.write("    # return header, data_new\n")
     file.write("\n")
     file.write(
-        f"processor = Processor(src_{model_mapped_name}, delimiter='{csv_delimiter}', preprocess=preprocess_{model_class_name})\n"
+        f"processor = Processor(src_{model_mapped_name}, config_file=source_config_file, delimiter='{csv_delimiter}', preprocess=preprocess_{model_class_name})\n"
     )
     file.write("\n")
 
@@ -1051,7 +1051,7 @@ def write_end(file: io.TextIOWrapper) -> None:
         ctx = f"'context': {{{', '.join(ctx_opt)}}}, "
 
     file.write(
-        f"processor.process({model_mapping_name}, dest_{model_mapped_name}, {{'model': '{model}', {ctx}'groupby': '', 'worker': DEFAULT_WORKER, 'batch_size': DEFAULT_BATCH_SIZE}}, 'set')\n\n"
+        f"processor.process({model_mapping_name}, dest_{model_mapped_name}, {{'config': destination_config_file, 'model': '{model}', {ctx}'groupby': '', 'worker': DEFAULT_WORKER, 'batch_size': DEFAULT_BATCH_SIZE}}, 'set')\n\n"
     )
     file.write(
         f"processor.write_to_file('{model_mapped_name}{script_extension}', python_exe='{default_python_exe}', path='{default_path}')\n\n"
