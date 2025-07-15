@@ -1767,7 +1767,7 @@ def main() -> None:
             )
             sys.exit(1)
 
-        sys.stdout.write("Generating import-compatible fields...\n")
+        sys.stdout.write("Printing import-compatible fields to console...\n")
         fields = load_fields()
         exportable_field_names = []
         for f in fields:
@@ -1784,10 +1784,6 @@ def main() -> None:
                 continue
 
             exportable_field_names.append(f.name)
-
-        sys.stdout.write(",".join(exportable_field_names) + "\n")
-        sys.stdout.write("Import-compatible fields generated.\n")
-        sys.exit(0)
 
     # If no action set, prompt for scaffolding
     action_args = [scaffold, model]
