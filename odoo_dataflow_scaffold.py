@@ -6,6 +6,7 @@ import configparser
 import io
 import os
 import platform
+import re
 import socket
 import sys
 from pathlib import Path
@@ -1406,27 +1407,33 @@ def create_export_script_file(
 
     mapping_end = mapper_content.find("}\n\n", mapping_start)
     if mapping_end == -1:
-        sys.stderr.write(
-            f"Error: Could not find end of mapping dictionary in {mapper_file_path}.\n"
-        )
-        sys.exit(1)
+        # Fallback for dictionaries that might end differently
+        mapping_end = mapper_content.find("\n}", mapping_start)
+        if mapping_end != -1:
+            mapping_end += 2  # include the closing brace
+        else:
+            sys.stderr.write(
+                f"Error: Could not find end of mapping dictionary in {mapper_file_path}.\n"
+            )
+            sys.exit(1)
 
     mapping_dict_str = mapper_content[
         mapping_start + len(f"{mapping_var_name} = {{") : mapping_end
     ]
+
+    # Use a regular expression to reliably extract field names (dictionary keys)
+    # This pattern looks for a quoted string (the key) followed by a colon.
+    key_pattern = re.compile(r"^\s*['\"]([^'\"]+)['\"]\s*:")
 
     for line in mapping_dict_str.splitlines():
         line = line.strip()
         if line.startswith("#") or not line:
             continue
 
-        # Extract the key (field name)
-        try:
-            field_name = line.split(":")[0].strip().strip("'\"")
-            if field_name:
-                field_names.append(field_name)
-        except IndexError:
-            continue
+        match = key_pattern.match(line)
+        if match:
+            field_name = match.group(1)
+            field_names.append(field_name)
 
     if not field_names:
         sys.stderr.write(
