@@ -1028,7 +1028,7 @@ def write_begin(file: io.TextIOWrapper) -> None:
     file.write("    # return header, data_new\n")
     file.write("\n")
     file.write(
-        f"processor = Processor(src_{model_mapped_name}, dtypes={model_mapped_name}_schema, delimiter='{csv_delimiter}, preprocess=preprocess_{model_class_name}')\n\n"
+        f"processor = Processor(src_{model_mapped_name}, schema_overrides={model_mapped_name}_schema, delimiter='{csv_delimiter}, preprocess=preprocess_{model_class_name}')\n\n"
     )
     file.write("\n")
 
