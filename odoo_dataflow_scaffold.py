@@ -186,6 +186,8 @@ def create_transform_script(file: Path) -> None:
     else:
         with file.open("w", encoding="utf-8") as f:
             f.write("#!/usr/bin/env bash\n\n")
+            f.write("# Use all available CPU cores for Polars operations\n")
+            f.write("export POLARS_MAX_THREADS=$(nproc)\n\n")
             f.write(f"LOGDIR={log_dir_name}\n")
             f.write(f"DATADIR={data_dir_name}\n\n")
             f.write("COLOR='\\033[1;32m'\n")
@@ -992,6 +994,7 @@ def write_begin(file: io.TextIOWrapper) -> None:
         file: The file object to write to.
     """
     file.write("# -*- coding: utf-8 -*-\n")
+    file.write("import polars as pl\n")
     file.write("\n")
     file.write("from odoo_data_flow.lib import mapper\n")
     file.write("from odoo_data_flow.lib.transform import Processor\n")
@@ -1025,9 +1028,35 @@ def write_begin(file: io.TextIOWrapper) -> None:
     file.write("    # return header, data_new\n")
     file.write("\n")
     file.write(
-        f"processor = Processor(src_{model_mapped_name}, config_file=source_config_file, delimiter='{csv_delimiter}', preprocess=preprocess_{model_class_name})\n"
+        f"processor = Processor(src_{model_mapped_name}, dtypes={model_mapped_name}_schema, delimiter='{csv_delimiter}, preprocess=preprocess_{model_class_name}')\n\n"
     )
     file.write("\n")
+
+
+def odoo_type_to_polars_type(odoo_type: str) -> str:
+    """Maps Odoo field types to Polars DataType strings."""
+    mapping = {
+        "char": "pl.Utf8",
+        "text": "pl.Utf8",
+        "html": "pl.Utf8",
+        "selection": "pl.Utf8",
+        "monetary": "pl.Float64",
+        "float": "pl.Float64",
+        "integer": "pl.Int64",
+        "boolean": "pl.Boolean",
+        "date": "pl.Date",
+        "datetime": "pl.Datetime",
+        "many2one": "pl.Utf8",
+        "many2one_reference": "pl.Int64",
+        "many2many": "pl.Utf8",
+        "binary": "pl.Utf8",
+        "json": "pl.Utf8",
+        "one2many": "pl.Utf8",
+        "properties": "pl.Utf8",
+        "properties_defenition": "pl.Utf8",
+        "reference": "pl.Utf8",
+    }
+    return mapping.get(odoo_type, "pl.Utf8")
 
 
 def write_end(file: io.TextIOWrapper) -> None:
@@ -1059,13 +1088,14 @@ def write_end(file: io.TextIOWrapper) -> None:
 
 
 def write_mapping(file: io.TextIOWrapper) -> None:
-    """Write the fields mapping of the generated python script.
+    """Write the fields mapping and schema of the generated python script.
 
     Args:
         file: The file object to write to.
     """
     if not dbname or offline:
         file.write(f"{model_mapping_name} = {{\n    'id': None,\n}}\n\n")
+        file.write(f"{model_mapped_name}_schema = None\n\n")
         return
 
     fields = load_fields()
@@ -1091,6 +1121,14 @@ def write_mapping(file: io.TextIOWrapper) -> None:
     fields = sorted(
         fields, key=lambda f: ((f.name != "id"), not f.is_required(), f.name)
     )
+
+    if skeleton in ("dict", "map"):
+        # --- Write the Schema Dictionary ---
+        file.write(f"{model_mapped_name}_schema = {{\n")
+        for f in fields:
+            polars_type = odoo_type_to_polars_type(f.type)
+            file.write(f"    '{f.get_mapping_name()}': {polars_type},\n")
+        file.write("}\n\n")
 
     if skeleton == "dict":
         file.write(f"{model_mapping_name} = {{\n")
