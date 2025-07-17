@@ -890,15 +890,21 @@ class ModelField:
 
         if self.relation:
             info += f" -> {self.relation}"
-            # Add XMLID summary in field info
-            model_data = self.connection.get_model("ir.model.data")
-            external_prefixes = model_data.read_group(
-                [("model", "=", self.relation)], ["module"], ["module"]
-            )
-            if external_prefixes:
-                info += " - with xml_id in module(s):"
-                for data in external_prefixes:
-                    info += f" {data['module']}({data['module_count']})"
+
+            # Wrap the ir.model.data access in a try...except block to handle AccessErrors.
+            try:
+                # Add XMLID summary in field info
+                model_data = self.connection.get_model("ir.model.data")
+                external_prefixes = model_data.read_group(
+                    [("model", "=", self.relation)], ["module"], ["module"]
+                )
+                if external_prefixes:
+                    info += " - with xml_id in module(s):"
+                    for data in external_prefixes:
+                        info += f" {data['module']}({data['module_count']})"
+            except Exception:
+                # If we can't access ir.model.data, just skip this enhancement.
+                pass
 
         if self.selection:
             info += f"\n    # SELECTION: {', '.join(self.selection)}"
@@ -965,6 +971,57 @@ class ModelField:
         return self.required and not self.default_value
 
 
+def load_fields_from_model() -> List[ModelField]:
+    """
+    Fallback method to build model fields list by calling fields_get() on the model itself.
+    This avoids requiring direct access to 'ir.model.fields'.
+
+    Returns:
+        A list of ModelField objects.
+    """
+    global has_tracked_fields
+    global has_computed_fields
+    sys.stdout.write(
+        "INFO: Access to 'ir.model.fields' failed. Using fallback method 'fields_get()'.\n"
+    )
+    has_tracked_fields, has_computed_fields = False, False
+    connection = conf_lib.get_connection_from_config(config)
+
+    try:
+        model_proxy = connection.get_model(model)
+        fields_properties = model_proxy.fields_get()
+    except Exception as e:
+        sys.stderr.write(
+            f"FATAL: Fallback method also failed. Could not get fields for model '{model}'. Error: {e}\n"
+        )
+        sys.exit(1)
+
+    ret = []
+    for field_name, properties in fields_properties.items():
+        # The output of fields_get() is slightly different from a read on ir.model.fields.
+        # We need to map the keys to what the ModelField class expects.
+        field_data = {
+            "id": 0,  # Not available via this method
+            "name": field_name,
+            "ttype": properties.get("type"),
+            "required": properties.get("required"),
+            "readonly": properties.get("readonly"),
+            "field_description": properties.get("string"),
+            "store": properties.get("store", True),
+            "track_visibility": properties.get("tracking"),
+            "related": properties.get("related"),
+            "relation": properties.get("relation"),
+            "depends": properties.get("depends"),
+            "compute": properties.get("compute"),
+            "selection": properties.get("selection"),
+        }
+        f = ModelField(connection, field_data)
+        has_tracked_fields = has_tracked_fields or bool(f.track_visibility)
+        has_computed_fields = has_computed_fields or bool(f.compute)
+        ret.append(f)
+    return ret
+
+
 def load_fields() -> List[ModelField]:
     """Build the model fields list, fetched as defined in the target database.
 
@@ -975,17 +1032,27 @@ def load_fields() -> List[ModelField]:
     global has_computed_fields
     has_tracked_fields, has_computed_fields = False, False
     connection = conf_lib.get_connection_from_config(config)
-    model_fields = connection.get_model("ir.model.fields")
 
-    field_ids = model_fields.search([("model", "=", model)])
-    fields = model_fields.read(field_ids)
-    ret = []
-    for field in fields:
-        f = ModelField(connection, field)
-        has_tracked_fields = has_tracked_fields or bool(f.track_visibility)
-        has_computed_fields = has_computed_fields or len(f.compute) > 1
-        ret.append(f)
-    return ret
+    try:
+        # Original method: try to access ir.model.fields
+        model_fields = connection.get_model("ir.model.fields")
+        field_ids = model_fields.search([("model", "=", model)])
+        if not field_ids:
+            raise ValueError(
+                f"No fields found for model '{model}' via ir.model.fields."
+            )
+        fields = model_fields.read(field_ids)
+
+        ret = []
+        for field in fields:
+            f = ModelField(connection, field)
+            has_tracked_fields = has_tracked_fields or bool(f.track_visibility)
+            has_computed_fields = has_computed_fields or len(f.compute) > 1
+            ret.append(f)
+        return ret
+    except Exception:
+        # Fallback method: if the above fails, try the alternative
+        return load_fields_from_model()
 
 
 def write_begin(file: io.TextIOWrapper) -> None:
@@ -1202,8 +1269,11 @@ def write_mapping(file: io.TextIOWrapper) -> None:
 
 
 def model_exists(model: str) -> bool:
-    """Return True if 'model' is scaffoldable.
+    """Model Ecistance check.
 
+    Return True if 'model' exists and is accessible by the current user.
+    This check does not require access rights to 'ir.model'.
+    
     Args:
         model: The model name to check.
 
@@ -1211,11 +1281,17 @@ def model_exists(model: str) -> bool:
         True if the model exists, False otherwise.
     """
     connection = conf_lib.get_connection_from_config(config)
-    model_model = connection.get_model("ir.model")
-    res = model_model.search_count(
-        [("model", "=", model), ("transient", "=", False)]
-    )
-    return res != 0
+    try:
+        # Get a proxy for the model directly.
+        model_proxy = connection.get_model(model)
+        # Perform a lightweight, safe operation to confirm it's real and accessible.
+        # Calling fields_get with a limited attribute set is very efficient.
+        model_proxy.fields_get(attributes=["id"])
+        return True
+    except Exception:
+        # This will catch any error, either from the model not existing
+        # or from the user not having access rights to it.
+        return False
 
 
 def scaffold_model() -> None:
